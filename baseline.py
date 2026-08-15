@@ -1,0 +1,120 @@
+"""Naive baseline for the cost curve: finetune the seen checkpoint on N target demos.
+
+This is the reference point for Task 2 and must not be edited after the fact.
+It is a thin wrapper over the official LeRobot CLI — see ext/lerobot/docs/source/libero.mdx.
+
+    python baseline.py train --episodes 12 13 14 15 16 --tag base_t0_n5 --seed 0
+    python baseline.py eval  --policy outputs/base_t0_n5/checkpoints/last/pretrained_model \\
+                             --task-id 0 --method baseline --n-demos 5 --seed 0
+
+LIBERO needs Linux + MUJOCO_GL=egl; on macOS only --dry-run makes sense.
+"""
+
+import argparse
+import json
+import pathlib
+import subprocess
+
+SUITE = "libero_goal"
+RESULTS = pathlib.Path("runs") / "results.jsonl"
+
+
+def run(cmd, dry):
+    print(" \\\n  ".join(cmd))
+    if dry:
+        return 0
+    return subprocess.call(cmd)
+
+
+def cmd_train(a):
+    out = f"outputs/{a.tag}"
+    cmd = [
+        "lerobot-train",
+        f"--policy.path={a.ckpt}",
+        f"--dataset.repo_id={a.dataset}",
+        f"--output_dir={out}",
+        f"--job_name={a.tag}",
+        f"--steps={a.steps}",
+        f"--batch_size={a.batch_size}",
+        f"--seed={a.seed}",
+        "--policy.device=cuda",
+        "--policy.push_to_hub=false",
+        "--wandb.enable=false",
+    ]
+    if a.episodes:
+        cmd.append("--dataset.episodes=[" + ",".join(str(e) for e in a.episodes) + "]")
+    if a.revision:
+        cmd.append(f"--dataset.revision={a.revision}")
+    return run(cmd, a.dry_run)
+
+
+def cmd_eval(a):
+    out = f"eval_logs/{a.tag or pathlib.Path(a.policy).parts[1]}_t{a.task_id}"
+    cmd = [
+        "lerobot-eval",
+        f"--policy.path={a.policy}",
+        f"--output_dir={out}",
+        "--env.type=libero",
+        f"--env.task={a.suite}",
+        f"--env.task_ids=[{a.task_id}]",
+        f"--eval.n_episodes={a.n_episodes}",
+        "--eval.batch_size=1",
+        "--env.max_parallel_tasks=1",
+        f"--seed={a.eval_seed}",
+        "--env.init_states=true",
+    ]
+    code = run(cmd, a.dry_run)
+    if code or a.dry_run:
+        return code
+
+    info = json.loads((pathlib.Path(out) / "eval_info.json").read_text())
+    agg = info.get("aggregated") or next(iter(info.values()))["aggregated"]
+    RESULTS.parent.mkdir(exist_ok=True)
+    with RESULTS.open("a") as f:
+        f.write(json.dumps({
+            "method": a.method,
+            "seed": a.seed,
+            "task": f"{a.suite}_{a.task_id}",
+            "n_demos": a.n_demos,
+            "success": agg["pc_success"] / 100,
+            "n_episodes": a.n_episodes,
+            "policy": a.policy,
+        }) + "\n")
+    print(f"success {agg['pc_success']:.1f}%  -> {RESULTS}")
+    return 0
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--dry-run", action="store_true", help="print the command, do not run it")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    t = sub.add_parser("train")
+    t.add_argument("--ckpt", default="lerobot/smolvla_base", help="seen checkpoint to adapt")
+    t.add_argument("--dataset", default="lerobot/libero")
+    t.add_argument("--revision", default=None, help="pin the dataset commit when reporting")
+    t.add_argument("--episodes", type=int, nargs="*", help="first N demos, from demo_subset.py")
+    t.add_argument("--steps", type=int, default=20000)
+    t.add_argument("--batch-size", type=int, default=32)
+    t.add_argument("--seed", type=int, default=0)
+    t.add_argument("--tag", required=True)
+    t.set_defaults(fn=cmd_train)
+
+    e = sub.add_parser("eval")
+    e.add_argument("--policy", required=True)
+    e.add_argument("--suite", default=SUITE)
+    e.add_argument("--task-id", type=int, required=True)
+    e.add_argument("--n-episodes", type=int, default=20)
+    e.add_argument("--eval-seed", type=int, default=1000)
+    e.add_argument("--method", default="baseline", help="label written to results.jsonl")
+    e.add_argument("--n-demos", type=int, required=True)
+    e.add_argument("--seed", type=int, default=0, help="training seed of the evaluated policy")
+    e.add_argument("--tag", default=None)
+    e.set_defaults(fn=cmd_eval)
+
+    a = p.parse_args()
+    raise SystemExit(a.fn(a))
+
+
+if __name__ == "__main__":
+    main()
