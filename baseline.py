@@ -12,8 +12,11 @@ LIBERO needs Linux + MUJOCO_GL=egl; on macOS only --dry-run makes sense.
 
 import argparse
 import json
+import os
 import pathlib
 import subprocess
+
+import mlflow
 
 SUITE = "libero_goal"
 RESULTS = pathlib.Path("runs") / "results.jsonl"
@@ -69,17 +72,26 @@ def cmd_eval(a):
 
     info = json.loads((pathlib.Path(out) / "eval_info.json").read_text())
     agg = info.get("aggregated") or next(iter(info.values()))["aggregated"]
+    row = {
+        "method": a.method,
+        "seed": a.seed,
+        "task": f"{a.suite}_{a.task_id}",
+        "n_demos": a.n_demos,
+        "success": agg["pc_success"] / 100,
+        "n_episodes": a.n_episodes,
+        "policy": a.policy,
+    }
     RESULTS.parent.mkdir(exist_ok=True)
     with RESULTS.open("a") as f:
-        f.write(json.dumps({
-            "method": a.method,
-            "seed": a.seed,
-            "task": f"{a.suite}_{a.task_id}",
-            "n_demos": a.n_demos,
-            "success": agg["pc_success"] / 100,
-            "n_episodes": a.n_episodes,
-            "policy": a.policy,
-        }) + "\n")
+        f.write(json.dumps(row) + "\n")
+
+    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
+    mlflow.set_experiment("vla-cost-curve")
+    with mlflow.start_run(run_name=f"{a.method}_n{a.n_demos}_t{a.task_id}_s{a.seed}"):
+        mlflow.log_params({k: row[k] for k in ("method", "seed", "task", "n_demos", "policy")})
+        mlflow.log_metrics({"success": row["success"], "n_episodes": a.n_episodes},
+                           step=a.n_demos)
+
     print(f"success {agg['pc_success']:.1f}%  -> {RESULTS}")
     return 0
 

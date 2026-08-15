@@ -28,3 +28,8 @@ ext/*
 # артефакты lerobot
 outputs/
 eval_logs/
+
+# mlflow (локальный трекинг)
+mlflow.db
+mlruns/
+mlartifacts/

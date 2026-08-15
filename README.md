@@ -30,3 +30,9 @@ python cost_curve.py runs/results.jsonl --plot
 ```
 
 Все точки копятся в `runs/results.jsonl`; график — `runs/cost_curve.png`.
+
+Метрики — в локальный MLflow (`sqlite:///mlflow.db`):
+
+```bash
+mlflow ui --backend-store-uri sqlite:///mlflow.db
+```
