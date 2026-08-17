@@ -5,14 +5,15 @@
 
 ## Setup
 
-Локально (macOS) — только инспекция датасета и графики:
+macOS (симулятор работает, но медленно — 20 шагов/с):
 
 ```bash
 ./setup.sh
-source .venv/bin/activate
+./setup_macos_libero.sh      # LIBERO в обход hf-egl-probe
+export MUJOCO_GL=cgl
 ```
 
-Обучение и оценка — на Linux-машине с GPU (LIBERO не ставится на macOS):
+Linux + GPU (полные прогоны):
 
 ```bash
 ./setup_gpu.sh
