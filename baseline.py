@@ -52,7 +52,7 @@ def cmd_train(a):
 
 
 def cmd_eval(a):
-    out = f"eval_logs/{a.tag or pathlib.Path(a.policy).parts[1]}_t{a.task_id}"
+    out = f"eval_logs/{a.tag or f'{pathlib.Path(a.policy).parts[1]}_t{a.task_id}'}"
     cmd = [
         "lerobot-eval",
         f"--policy.path={a.policy}",

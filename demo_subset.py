@@ -49,6 +49,9 @@ def main():
     p.add_argument("--repo-id", default="lerobot/libero")
     p.add_argument("--revision", default=None)
     p.add_argument("--list", action="store_true", help="print task_index -> instruction")
+    p.add_argument("--suite", default=None,
+                   help="сопоставить порядок сьюта (--env.task_ids) с task_index датасета; "
+                        "требует установленный libero")
     p.add_argument("--task", default=None, help="instruction string")
     p.add_argument("--task-index", type=int, default=None)
     p.add_argument("--n", type=int, default=5)
@@ -60,6 +63,18 @@ def main():
     if args.list:
         for task, row in meta.tasks.iterrows():
             print(f"{int(row.task_index):>3}  {task}")
+        return
+
+    if args.suite:
+        # единственное место, где нужен сам симулятор: порядок задач внутри сьюта
+        from libero.libero import benchmark
+
+        suite = benchmark.get_benchmark_dict()[args.suite]()
+        print(f"{'task_id':>7} {'task_index':>11}  инструкция")
+        for task_id in range(suite.n_tasks):
+            instruction = suite.get_task(task_id).language
+            index = meta.get_task_index(instruction)
+            print(f"{task_id:>7} {str(index):>11}  {instruction}")
         return
 
     if args.task is not None:
