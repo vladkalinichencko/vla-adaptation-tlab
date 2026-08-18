@@ -28,6 +28,15 @@ RENAME_MAP = ('--rename_map={"observation.images.image": "observation.images.cam
               '"observation.images.image2": "observation.images.camera2"}')
 
 
+def aggregated(info):
+    """Метрики из eval_info.json: lerobot кладёт их под 'overall' (или 'aggregated')."""
+    for key in ("overall", "aggregated"):
+        if key in info:
+            block = info[key]
+            return block.get("aggregated", block)
+    raise KeyError(f"не нашёл агрегированные метрики, ключи: {list(info)}")
+
+
 def cli(name):
     """CLI из того же venv, что и текущий python — чтобы работало без активации."""
     candidate = pathlib.Path(sys.executable).parent / name
@@ -89,7 +98,7 @@ def cmd_eval(a):
         return code
 
     info = json.loads((pathlib.Path(out) / "eval_info.json").read_text())
-    agg = info.get("aggregated") or next(iter(info.values()))["aggregated"]
+    agg = aggregated(info)
     row = {
         "method": a.method,
         "seed": a.seed,
