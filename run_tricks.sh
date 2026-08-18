@@ -22,7 +22,8 @@ run_one () {
     echo "  обучение: exit=$?"
   fi
   # проверяем, что Metal ничего не отбросил, иначе числа мусорные
-  errs=$(grep -ac "command buffer exited with error" "tmp/trick_${tag}_train.log" 2>/dev/null || echo 0)
+  errs=$(grep -ac "command buffer exited with error" "tmp/trick_${tag}_train.log" 2>/dev/null; true)
+  errs=${errs:-0}
   if [ "$errs" -gt 0 ]; then
     echo "  !! $errs ошибок Metal — прогон недостоверен, пропускаю оценку"
     return
