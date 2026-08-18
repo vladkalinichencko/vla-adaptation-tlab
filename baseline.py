@@ -16,11 +16,18 @@ import json
 import os
 import pathlib
 import subprocess
+import sys
 
 import mlflow
 
 SUITE = "libero_goal"
 RESULTS = pathlib.Path("runs") / "results.jsonl"
+
+
+def cli(name):
+    """CLI из того же venv, что и текущий python — чтобы работало без активации."""
+    candidate = pathlib.Path(sys.executable).parent / name
+    return str(candidate) if candidate.exists() else name
 
 
 def run(cmd, dry):
@@ -33,7 +40,7 @@ def run(cmd, dry):
 def cmd_train(a):
     out = f"outputs/{a.tag}"
     cmd = [
-        "lerobot-train",
+        cli("lerobot-train"),
         f"--policy.path={a.ckpt}",
         f"--dataset.repo_id={a.dataset}",
         f"--output_dir={out}",
@@ -56,7 +63,7 @@ def cmd_train(a):
 def cmd_eval(a):
     out = f"eval_logs/{a.tag or f'{pathlib.Path(a.policy).parts[1]}_t{a.task_id}'}"
     cmd = [
-        "lerobot-eval",
+        cli("lerobot-eval"),
         f"--policy.path={a.policy}",
         f"--output_dir={out}",
         "--env.type=libero",
