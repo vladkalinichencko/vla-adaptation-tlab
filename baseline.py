@@ -23,6 +23,10 @@ import mlflow
 SUITE = "libero_goal"
 RESULTS = pathlib.Path("runs") / "results.jsonl"
 
+# smolvla ждёт camera1/2/3, LIBERO отдаёт image/image2 — нужно и train, и eval
+RENAME_MAP = ('--rename_map={"observation.images.image": "observation.images.camera1", '
+              '"observation.images.image2": "observation.images.camera2"}')
+
 
 def cli(name):
     """CLI из того же venv, что и текущий python — чтобы работало без активации."""
@@ -50,6 +54,7 @@ def cmd_train(a):
         f"--seed={a.seed}",
         "--policy.push_to_hub=false",
         "--wandb.enable=false",
+        RENAME_MAP,
     ]
     if a.device:
         cmd.append(f"--policy.device={a.device}")
@@ -74,9 +79,7 @@ def cmd_eval(a):
         "--env.max_parallel_tasks=1",
         f"--seed={a.eval_seed}",
         "--env.init_states=true",
-        # smolvla ждёт camera1/2/3, LIBERO отдаёт image/image2
-        '--rename_map={"observation.images.image": "observation.images.camera1", '
-        '"observation.images.image2": "observation.images.camera2"}',
+        RENAME_MAP,
     ]
     if a.device:
         cmd.append(f"--policy.device={a.device}")
