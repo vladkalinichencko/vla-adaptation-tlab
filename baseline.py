@@ -7,7 +7,8 @@ It is a thin wrapper over the official LeRobot CLI — see ext/lerobot/docs/sour
     python baseline.py eval  --policy outputs/base_t0_n5/checkpoints/last/pretrained_model \\
                              --task-id 0 --method baseline --n-demos 5 --seed 0
 
-LIBERO needs Linux + MUJOCO_GL=egl; on macOS only --dry-run makes sense.
+Linux: MUJOCO_GL=egl, --device cuda. macOS: MUJOCO_GL=cgl, --device mps (медленнее,
+но работает — см. setup_macos_libero.sh).
 """
 
 import argparse
@@ -40,10 +41,11 @@ def cmd_train(a):
         f"--steps={a.steps}",
         f"--batch_size={a.batch_size}",
         f"--seed={a.seed}",
-        "--policy.device=cuda",
         "--policy.push_to_hub=false",
         "--wandb.enable=false",
     ]
+    if a.device:
+        cmd.append(f"--policy.device={a.device}")
     if a.episodes:
         cmd.append("--dataset.episodes=[" + ",".join(str(e) for e in a.episodes) + "]")
     if a.revision:
@@ -65,7 +67,12 @@ def cmd_eval(a):
         "--env.max_parallel_tasks=1",
         f"--seed={a.eval_seed}",
         "--env.init_states=true",
+        # smolvla ждёт camera1/2/3, LIBERO отдаёт image/image2
+        '--rename_map={"observation.images.image": "observation.images.camera1", '
+        '"observation.images.image2": "observation.images.camera2"}',
     ]
+    if a.device:
+        cmd.append(f"--policy.device={a.device}")
     code = run(cmd, a.dry_run)
     if code or a.dry_run:
         return code
@@ -99,6 +106,7 @@ def cmd_eval(a):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--dry-run", action="store_true", help="print the command, do not run it")
+    p.add_argument("--device", default=None, help="cuda | mps | cpu (по умолчанию решает lerobot)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     t = sub.add_parser("train")

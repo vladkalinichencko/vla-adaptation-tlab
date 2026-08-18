@@ -23,6 +23,7 @@ TASK_INDICES=(19 17 14)                           # те же задачи в д
 BUDGETS=(5 10 25)
 SEEDS=(0 1)
 EPISODES="${EPISODES:-20}"
+RENAME='{"observation.images.image": "observation.images.camera1", "observation.images.image2": "observation.images.camera2"}'
 STEPS="${STEPS:-20000}"
 DRY_FLAG=""
 [ "${DRY:-0}" = "1" ] && DRY_FLAG="--dry-run"
