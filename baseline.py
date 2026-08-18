@@ -41,7 +41,7 @@ def run(cmd, dry):
     return subprocess.call(cmd)
 
 
-def cmd_train(a):
+def cmd_train(a, extra=()):
     out = f"outputs/{a.tag}"
     cmd = [
         cli("lerobot-train"),
@@ -62,6 +62,7 @@ def cmd_train(a):
         cmd.append("--dataset.episodes=[" + ",".join(str(e) for e in a.episodes) + "]")
     if a.revision:
         cmd.append(f"--dataset.revision={a.revision}")
+    cmd += list(extra)  # флаги приёмов адаптации уходят в lerobot как есть
     return run(cmd, a.dry_run)
 
 
@@ -142,8 +143,8 @@ def main():
     e.add_argument("--tag", default=None)
     e.set_defaults(fn=cmd_eval)
 
-    a = p.parse_args()
-    raise SystemExit(a.fn(a))
+    a, extra = p.parse_known_args()
+    raise SystemExit(a.fn(a, extra) if a.fn is cmd_train else a.fn(a))
 
 
 if __name__ == "__main__":
