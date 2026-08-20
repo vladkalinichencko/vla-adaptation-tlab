@@ -37,6 +37,22 @@ def aggregated(info):
     raise KeyError(f"не нашёл агрегированные метрики, ключи: {list(info)}")
 
 
+def record(row):
+    """Одна строка в runs/results.jsonl и одна запись в MLflow. Все скрипты пишут сюда."""
+    RESULTS.parent.mkdir(exist_ok=True)
+    with RESULTS.open("a") as f:
+        f.write(json.dumps(row) + "\n")
+
+    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
+    mlflow.set_experiment("vla-cost-curve")
+    name = f"{row['method']}_n{row['n_demos']}_t{row['task']}_s{row['seed']}"
+    with mlflow.start_run(run_name=name):
+        mlflow.log_params({k: row[k] for k in ("method", "seed", "task", "n_demos", "policy")})
+        mlflow.log_metrics({"success": row["success"], "n_episodes": row["n_episodes"]},
+                           step=row["n_demos"])
+    print(f"success {row['success'] * 100:.1f}%  -> {RESULTS}")
+
+
 def cli(name):
     """CLI из того же venv, что и текущий python — чтобы работало без активации."""
     candidate = pathlib.Path(sys.executable).parent / name
@@ -98,28 +114,15 @@ def cmd_eval(a):
         return code
 
     info = json.loads((pathlib.Path(out) / "eval_info.json").read_text())
-    agg = aggregated(info)
-    row = {
+    record({
         "method": a.method,
         "seed": a.seed,
         "task": f"{a.suite}_{a.task_id}",
         "n_demos": a.n_demos,
-        "success": agg["pc_success"] / 100,
+        "success": aggregated(info)["pc_success"] / 100,
         "n_episodes": a.n_episodes,
         "policy": a.policy,
-    }
-    RESULTS.parent.mkdir(exist_ok=True)
-    with RESULTS.open("a") as f:
-        f.write(json.dumps(row) + "\n")
-
-    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
-    mlflow.set_experiment("vla-cost-curve")
-    with mlflow.start_run(run_name=f"{a.method}_n{a.n_demos}_t{a.task_id}_s{a.seed}"):
-        mlflow.log_params({k: row[k] for k in ("method", "seed", "task", "n_demos", "policy")})
-        mlflow.log_metrics({"success": row["success"], "n_episodes": a.n_episodes},
-                           step=a.n_demos)
-
-    print(f"success {agg['pc_success']:.1f}%  -> {RESULTS}")
+    })
     return 0
 
 
