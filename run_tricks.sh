@@ -23,7 +23,9 @@ BS=2          # batch 4 роняет Metal, см. NOTES
 run_one () {
   local tag="$1"; local eps="$2"; local steps="$3"; shift 3
   echo "=== $tag ==="
-  if [ ! -d "outputs/$tag" ]; then
+  # обучение пропускается, только если чекпойнт реально есть: пустая папка от
+  # упавшего прогона иначе молча уводит оценку на старый чекпойнт
+  if [ ! -d "outputs/$tag/checkpoints/last/pretrained_model" ]; then
     $PY baseline.py --device mps train --tag "$tag" --episodes $eps \
       --steps "$steps" --batch-size $BS --seed 0 "$@" > "tmp/trick_${tag}_train.log" 2>&1
     echo "  обучение: exit=$?"
