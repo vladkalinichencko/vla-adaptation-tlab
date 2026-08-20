@@ -50,7 +50,14 @@ has () { for w in "${SELECT[@]}"; do [ "$w" = "$1" ] && return 0; done; return 1
 
 has default  && run_one trick_default  "$EP" "$STEPS"
 has unfrozen && run_one trick_unfrozen "$EP" "$STEPS" --policy.freeze_vision_encoder=false --policy.train_expert_only=false
-has lora     && run_one trick_lora     "$EP" "$STEPS" --peft.method_type=LORA --peft.r=32 --peft.lora_alpha=32
+# у LoRA свой шаг оптимизатора: обучаемых параметров на порядки меньше. Задавать
+# его приходится в обход пресета политики — иначе флаг принимается и выбрасывается,
+# см. NOTES
+has lora     && run_one trick_lora     "$EP" "$STEPS" --peft.method_type=LORA --peft.r=32 \
+  --peft.lora_alpha=32 --use_policy_training_preset=false \
+  --optimizer.type=adamw --optimizer.lr=1e-3 --optimizer.grad_clip_norm=10 \
+  --scheduler.type=cosine_decay_with_warmup --scheduler.peak_lr=1e-3 \
+  --scheduler.decay_lr=1e-5 --scheduler.num_warmup_steps=100 --scheduler.num_decay_steps="$STEPS"
 has mix      && run_one trick_mix2     "$EP $SEEN" "$((STEPS * 2))"
 has chunk    && run_one trick_chunk    "$EP" "$STEPS" --policy.chunk_size=10 --policy.n_action_steps=10
 has aug      && run_one trick_aug      "$EP" "$STEPS" --dataset.image_transforms.enable=true
