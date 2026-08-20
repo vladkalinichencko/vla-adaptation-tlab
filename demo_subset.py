@@ -54,6 +54,9 @@ def main():
                         "требует установленный libero")
     p.add_argument("--task", default=None, help="instruction string")
     p.add_argument("--task-index", type=int, default=None)
+    p.add_argument("--task-indices", type=int, nargs="+", default=None,
+                   help="несколько задач сразу: первые --n демо каждой, одним списком; "
+                        "так набирается подмешивание демо seen-задач")
     p.add_argument("--n", type=int, default=5)
     p.add_argument("--refresh", action="store_true", help="пересобрать карту, игнорируя кеш")
     args = p.parse_args()
@@ -75,6 +78,14 @@ def main():
             instruction = suite.get_task(task_id).language
             index = meta.get_task_index(instruction)
             print(f"{task_id:>7} {str(index):>11}  {instruction}")
+        return
+
+    if args.task_indices:
+        mapping = episode_task_map(args.repo_id, args.revision, args.refresh)
+        episodes = [ep for index in args.task_indices
+                    for ep in [e for e in sorted(mapping) if mapping[e] == index][: args.n]]
+        print(f"{len(args.task_indices)} задач × {args.n} демо = {len(episodes)} эпизодов")
+        print("--dataset.episodes=[" + ",".join(str(e) for e in episodes) + "]")
         return
 
     if args.task is not None:
