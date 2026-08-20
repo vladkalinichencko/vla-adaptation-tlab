@@ -13,6 +13,7 @@ import json
 import pathlib
 
 import cost_curve
+import rollouts
 
 TEMPLATE = """<title>VLA — кривая цены адаптации</title>
 <style>
@@ -80,6 +81,22 @@ const app = document.getElementById("app");
   app.appendChild(el("div",{class:"card"},[g]));
 }
 
+// --- кадры провалов
+if (DATA.failures.length) {
+  app.appendChild(el("h2",{},["Где ломается траектория"]));
+  app.appendChild(el("p",{class:"note"},["Кадры равномерно по эпизоду, слева направо. "
+    + "Строка — один эпизод; подпись — прогон и исход."]));
+  const t = el("table",{});
+  for (const f of DATA.failures) {
+    const tr = el("tr",{});
+    tr.appendChild(el("td",{},[f.run + " · эп." + f.episode + " · " + (f.ok ? "успех" : "ПРОВАЛ")]));
+    for (const src of f.frames)
+      tr.appendChild(el("td",{},[el("img",{src: src, style:"width:150px;border-radius:4px"})]));
+    t.appendChild(tr);
+  }
+  app.appendChild(t);
+}
+
 // --- все ячейки
 {
   app.appendChild(el("h2",{},["Каждая измеренная ячейка"]));
@@ -102,16 +119,27 @@ def main():
     p.add_argument("results", nargs="?", default="runs/results.jsonl")
     p.add_argument("--out", default="runs/report.html")
     p.add_argument("--only", nargs="+", default=None, help="какие методы показывать на кривой")
+    p.add_argument("--fail-runs", nargs="+", default=["fixed_n25"],
+                   help="из каких оценок брать кадры провалов")
+    p.add_argument("--n-fails", type=int, default=3)
     args = p.parse_args()
 
     rows = [json.loads(x) for x in pathlib.Path(args.results).read_text().splitlines() if x.strip()]
     curve = cost_curve.load(args.results)
     if args.only:
         curve = {m: v for m, v in curve.items() if m in args.only}
+    picked = [e for e in rollouts.episodes() if e[0] in args.fail_runs]
+    failures = []
+    for run, _, episode, ok, path in ([e for e in picked if not e[3]][: args.n_fails]
+                                      + [e for e in picked if e[3]][:1]):
+        images, _ = rollouts.frames(path, 4)
+        failures.append({"run": run, "episode": episode, "ok": ok,
+                         "frames": [rollouts.as_data_uri(f) for f in images]})
+
     data = {"curve": {m: {str(n): v for n, v in d.items()} for m, d in curve.items()},
-            "rows": rows}
+            "rows": rows, "failures": failures}
     pathlib.Path(args.out).write_text(TEMPLATE.replace("__DATA__", json.dumps(data, ensure_ascii=False)))
-    print(f"{len(curve)} методов, {len(rows)} ячеек -> {args.out}")
+    print(f"{len(curve)} методов, {len(rows)} ячеек, {len(failures)} роллаутов -> {args.out}")
 
 
 if __name__ == "__main__":
