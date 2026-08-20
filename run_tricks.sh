@@ -11,19 +11,21 @@ cd "$(dirname "$0")"
 export MUJOCO_GL=cgl PYTORCH_ENABLE_MPS_FALLBACK=1
 PY=".venv/bin/python"
 EP="399 405 410 421 437"      # первые 5 демо задачи 0 (task_index 19)
-# по 4 демо каждой из десяти задач libero_object: единственные seen-задачи в
-# lerobot/libero — libero_90 в этот датасет не входит, см. NOTES
-SEEN="807 829 832 835 808 809 815 820 810 856 862 886 811 812 824 843 813 818 825 850 \
-814 817 842 851 816 822 831 865 819 827 828 844 821 830 839 864 823 826 834 840"
+# демо libero_object: единственные seen-задачи в lerobot/libero — libero_90 в этот
+# датасет не входит, см. NOTES. Пять штук, по одному на задачу, и шагов вдвое больше:
+# так целевые демо видны столько же раз, сколько в бейзлайне. Первый заход был с
+# сорока демо при том же числе шагов, целевые демо получили в девять раз меньше
+# показов, и success упал в ноль — мерилось разведение, а не подмешивание.
+SEEN="807 808 810 811 813"
 STEPS=1500
 BS=2          # batch 4 роняет Metal, см. NOTES
 
 run_one () {
-  local tag="$1"; local eps="$2"; shift 2
+  local tag="$1"; local eps="$2"; local steps="$3"; shift 3
   echo "=== $tag ==="
   if [ ! -d "outputs/$tag" ]; then
     $PY baseline.py --device mps train --tag "$tag" --episodes $eps \
-      --steps $STEPS --batch-size $BS --seed 0 "$@" > "tmp/trick_${tag}_train.log" 2>&1
+      --steps "$steps" --batch-size $BS --seed 0 "$@" > "tmp/trick_${tag}_train.log" 2>&1
     echo "  обучение: exit=$?"
   fi
   # проверяем, что Metal ничего не отбросил, иначе числа мусорные
@@ -44,12 +46,12 @@ SELECT=("$@")
 [ ${#SELECT[@]} -eq 0 ] && SELECT=(default unfrozen lora mix chunk aug)
 has () { for w in "${SELECT[@]}"; do [ "$w" = "$1" ] && return 0; done; return 1; }
 
-has default  && run_one trick_default  "$EP"
-has unfrozen && run_one trick_unfrozen "$EP" --policy.freeze_vision_encoder=false --policy.train_expert_only=false
-has lora     && run_one trick_lora     "$EP" --peft.method_type=LORA --peft.r=32 --peft.lora_alpha=32
-has mix      && run_one trick_mix      "$EP $SEEN"
-has chunk    && run_one trick_chunk    "$EP" --policy.chunk_size=10 --policy.n_action_steps=10
-has aug      && run_one trick_aug      "$EP" --dataset.image_transforms.enable=true
+has default  && run_one trick_default  "$EP" "$STEPS"
+has unfrozen && run_one trick_unfrozen "$EP" "$STEPS" --policy.freeze_vision_encoder=false --policy.train_expert_only=false
+has lora     && run_one trick_lora     "$EP" "$STEPS" --peft.method_type=LORA --peft.r=32 --peft.lora_alpha=32
+has mix      && run_one trick_mix2     "$EP $SEEN" "$((STEPS * 2))"
+has chunk    && run_one trick_chunk    "$EP" "$STEPS" --policy.chunk_size=10 --policy.n_action_steps=10
+has aug      && run_one trick_aug      "$EP" "$STEPS" --dataset.image_transforms.enable=true
 
 echo
 echo "=== итог ==="
