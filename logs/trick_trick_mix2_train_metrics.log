@@ -1,0 +1,15 @@
+smpl:400 ep:3 epch:0.29 loss:1.222 grdn:14.678 lr:7.5e-05
+smpl:800 ep:6 epch:0.58 loss:0.764 grdn:8.187 lr:9.8e-05
+smpl:1K ep:9 epch:0.86 loss:0.606 grdn:6.820 lr:9.3e-05
+smpl:2K ep:12 epch:1.15 loss:0.549 grdn:5.977 lr:8.7e-05
+smpl:2K ep:14 epch:1.44 loss:0.467 grdn:5.502 lr:8.0e-05
+smpl:2K ep:17 epch:1.73 loss:0.432 grdn:5.373 lr:7.1e-05
+smpl:3K ep:20 epch:2.01 loss:0.355 grdn:4.918 lr:6.1e-05
+smpl:3K ep:23 epch:2.30 loss:0.313 grdn:4.293 lr:5.1e-05
+smpl:4K ep:26 epch:2.59 loss:0.299 grdn:3.981 lr:4.1e-05
+smpl:4K ep:29 epch:2.88 loss:0.270 grdn:3.567 lr:3.1e-05
+smpl:4K ep:32 epch:3.17 loss:0.237 grdn:3.397 lr:2.3e-05
+smpl:5K ep:35 epch:3.45 loss:0.232 grdn:3.395 lr:1.5e-05
+smpl:5K ep:37 epch:3.74 loss:0.239 grdn:3.372 lr:9.1e-06
+smpl:6K ep:40 epch:4.03 loss:0.224 grdn:3.255 lr:5.0e-06
+smpl:6K ep:43 epch:4.32 loss:0.218 grdn:3.106 lr:2.9e-06

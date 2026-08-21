@@ -1,0 +1,7 @@
+smpl:400 ep:3 epch:0.59 loss:1.158 grdn:2.818 lr:7.4e-04
+smpl:800 ep:6 epch:1.17 loss:0.598 grdn:1.347 lr:9.0e-04
+smpl:1K ep:9 epch:1.76 loss:0.529 grdn:1.171 lr:7.5e-04
+smpl:2K ep:12 epch:2.35 loss:0.435 grdn:0.996 lr:5.6e-04
+smpl:2K ep:15 epch:2.93 loss:0.388 grdn:0.961 lr:3.5e-04
+smpl:2K ep:18 epch:3.52 loss:0.327 grdn:0.896 lr:1.8e-04
+smpl:3K ep:21 epch:4.11 loss:0.314 grdn:0.843 lr:5.6e-05
