@@ -1,0 +1,10 @@
+=== trick_mix ===
+  обучение: exit=0
+  оценка: exit=0 | success 0.0%  -> runs/results.jsonl
+
+=== итог ===
+ demos         zeroshot_base         trick_default        trick_unfrozen            trick_lora               default                 fixed     wrong_instruction             trick_mix
+     0         0.000 ±0.000 (1)                     —                     —                     —                     —                     —                     —                     —
+     5                     —         0.400 ±0.000 (1)         0.450 ±0.000 (1)         0.000 ±0.000 (1)                     —         0.400 ±0.000 (1)                     —         0.000 ±0.000 (1)
+    10                     —                     —                     —                     —         0.300 ±0.000 (1)         0.600 ±0.000 (1)                     —                     —
+    25                     —                     —                     —                     —         0.150 ±0.000 (1)         0.700 ±0.000 (1)         0.200 ±0.000 (1)                     —

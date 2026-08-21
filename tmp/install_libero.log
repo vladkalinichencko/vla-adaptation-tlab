@@ -1,0 +1,19 @@
+### 1. зависимости robosuite, кроме egl_probe
+### 2. robosuite и libero без своих зависимостей
+### 3. то, что libero тянет помимо egl_probe
+robomimic 0.3.0 requires tensorboardX, which is not installed.
+hf-libero 0.1.4 requires bddl==1.0.1, but you have bddl 3.6.0 which is incompatible.
+hf-libero 0.1.4 requires robomimic==0.2.0, but you have robomimic 0.3.0 which is incompatible.
+
+### 4. что импортируется
+[robosuite WARNING] No private macro file found! (__init__.py:7)
+[robosuite WARNING] It is recommended to use a private macro file (__init__.py:8)
+[robosuite WARNING] To setup, run: python /Users/vladislavkalinichenko/VSCodeProjects/T-Lab Contests/world-action-reward-models/.venv/lib/python3.12/site-packages/robosuite/scripts/setup_macros.py (__init__.py:9)
+  OK      mujoco
+  OK      robosuite
+  OK      bddl
+  OK      robomimic
+  OK      libero
+
+### 5. список задач сьюта libero_goal
+Do you want to specify a custom path for the dataset folder? (Y/N):   ПАДАЕТ: EOFError: EOF when reading a line

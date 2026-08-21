@@ -1,0 +1,19 @@
+{"method": "zeroshot_base", "seed": 0, "task": "libero_goal_0", "n_demos": 0, "success": 0.0, "n_episodes": 20, "policy": "zeroshot_base_t0"}
+{"method": "zeroshot_base", "seed": 0, "task": "libero_goal_2", "n_demos": 0, "success": 0.0, "n_episodes": 20, "policy": "lerobot/smolvla_base"}
+{"method": "zeroshot_base", "seed": 0, "task": "libero_goal_1", "n_demos": 0, "success": 0.0, "n_episodes": 20, "policy": "zeroshot_base_t1"}
+{"method": "trick_default", "seed": 0, "task": "libero_goal_0", "n_demos": 5, "success": 0.4, "n_episodes": 20, "policy": "outputs/trick_default/checkpoints/last/pretrained_model"}
+{"method": "trick_unfrozen", "seed": 0, "task": "libero_goal_0", "n_demos": 5, "success": 0.45, "n_episodes": 20, "policy": "outputs/trick_unfrozen/checkpoints/last/pretrained_model"}
+{"method": "default", "seed": 0, "task": "libero_goal_0", "n_demos": 10, "success": 0.3, "n_episodes": 20, "policy": "outputs/default_n10/checkpoints/last/pretrained_model"}
+{"method": "default", "seed": 0, "task": "libero_goal_0", "n_demos": 25, "success": 0.15, "n_episodes": 20, "policy": "outputs/default_n25/checkpoints/last/pretrained_model"}
+{"method": "fixed", "seed": 0, "task": "libero_goal_0", "n_demos": 5, "success": 0.4, "n_episodes": 20, "policy": "outputs/fixed_n5/checkpoints/last/pretrained_model"}
+{"method": "fixed", "seed": 0, "task": "libero_goal_0", "n_demos": 10, "success": 0.6, "n_episodes": 20, "policy": "outputs/fixed_n10/checkpoints/last/pretrained_model"}
+{"method": "fixed", "seed": 0, "task": "libero_goal_0", "n_demos": 25, "success": 0.7, "n_episodes": 20, "policy": "outputs/fixed_n25/checkpoints/last/pretrained_model"}
+{"method": "wrong_instruction", "seed": 0, "task": "libero_goal_0", "n_demos": 25, "success": 0.2, "n_episodes": 20, "policy": "outputs/fixed_n25/checkpoints/last/pretrained_model", "instruction": "turn on the stove and put the moka pot on it"}
+{"method": "trick_mix", "seed": 0, "task": "libero_goal_0", "n_demos": 5, "success": 0.0, "n_episodes": 20, "policy": "outputs/trick_mix/checkpoints/last/pretrained_model"}
+{"method": "trick_lora", "seed": 0, "task": "libero_goal_0", "n_demos": 5, "success": 0.0, "n_episodes": 20, "policy": "outputs/trick_lora/checkpoints/last/pretrained_model"}
+{"method": "trick_mix2", "seed": 0, "task": "libero_goal_0", "n_demos": 5, "success": 0.8, "n_episodes": 20, "policy": "outputs/trick_mix2/checkpoints/last/pretrained_model"}
+{"method": "trick_default3000", "seed": 0, "task": "libero_goal_0", "n_demos": 5, "success": 0.5, "n_episodes": 20, "policy": "outputs/trick_default3000/checkpoints/last/pretrained_model"}
+{"method": "trick_chunk", "seed": 0, "task": "libero_goal_0", "n_demos": 5, "success": 0.15, "n_episodes": 20, "policy": "outputs/trick_chunk/checkpoints/last/pretrained_model"}
+{"method": "trick_aug", "seed": 0, "task": "libero_goal_0", "n_demos": 5, "success": 0.1, "n_episodes": 20, "policy": "outputs/trick_aug/checkpoints/last/pretrained_model"}
+{"method": "trick_lora_lr", "seed": 0, "task": "libero_goal_0", "n_demos": 5, "success": 0.0, "n_episodes": 20, "policy": "outputs/trick_lora_lr/checkpoints/last/pretrained_model"}
+{"method": "trick_lora_lr", "seed": 0, "task": "libero_goal_0", "n_demos": 5, "success": 0.3, "n_episodes": 20, "policy": "outputs/trick_lora_lr/checkpoints/last/pretrained_model"}
