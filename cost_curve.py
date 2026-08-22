@@ -11,7 +11,6 @@ training seeds.
     python cost_curve.py runs/results.jsonl --plot
 """
 
-import argparse
 import collections
 import json
 import pathlib
@@ -19,7 +18,7 @@ import statistics
 
 
 def load(path):
-    rows = [json.loads(l) for l in pathlib.Path(path).read_text().splitlines() if l.strip()]
+    rows = [json.loads(line) for line in pathlib.Path(path).read_text().splitlines() if line.strip()]
     per_cell = collections.defaultdict(list)  # (method, n_demos, seed) -> success per task
     for r in rows:
         per_cell[(r["method"], r["n_demos"], r["seed"])].append(r["success"])
@@ -39,12 +38,7 @@ def load(path):
 
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("results", default="runs/results.jsonl", nargs="?")
-    p.add_argument("--plot", action="store_true")
-    args = p.parse_args()
-
-    curve = load(args.results)
+    curve = load("runs/results.jsonl")
     budgets = sorted({n for m in curve.values() for n in m})
 
     print(f"{'demos':>6}" + "".join(f"{m:>22}" for m in curve))
@@ -58,7 +52,7 @@ def main():
                 line += f"{'—':>22}"
         print(line)
 
-    if args.plot:
+    if curve:
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots(figsize=(5, 4))

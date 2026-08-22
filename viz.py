@@ -8,7 +8,6 @@ At 20 episodes one success is 0.05, and that has to stay visible.
     python viz.py                      # -> runs/report.html
 """
 
-import argparse
 import json
 import pathlib
 
@@ -33,6 +32,7 @@ th { border-bottom:1px solid var(--line); font-weight:600; }
 .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--mut); margin:6px 0; }
 .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; }
 .ax { stroke:var(--line); } .tick { fill:var(--mut); font-size:10px; }
+select { background:var(--bg); color:var(--fg); border:1px solid var(--line); padding:5px; margin-right:6px; }
 </style>
 <h1>VLA: сколько демо стоит новая задача</h1>
 <p class="note">Success на целевых задачах libero_goal в зависимости от числа демо.
@@ -97,11 +97,70 @@ if (DATA.failures.length) {
   app.appendChild(t);
 }
 
+// --- динамика обучения
+if (DATA.training.length) {
+  app.appendChild(el("h2",{},["Динамика обучения"]));
+  const runSelect = el("select",{}), metricSelect = el("select",{}), body = el("div",{});
+  DATA.training.forEach((run,i)=>runSelect.appendChild(el("option",{value:i},[run.name])));
+  const draw = () => {
+    const run = DATA.training[+runSelect.value];
+    const metrics = Object.keys(run.rows[0] || {}).filter(k => k !== "step" && typeof run.rows[0][k] === "number");
+    const previous = metricSelect.value;
+    metricSelect.replaceChildren(...metrics.map(k=>el("option",{value:k},[k])));
+    if (metrics.includes(previous)) metricSelect.value = previous;
+    const key = metricSelect.value, values = run.rows.map(r=>r[key]);
+    const w=620, h=220, pad=38, lo=Math.min(...values), hi=Math.max(...values), span=Math.max(hi-lo,1e-12);
+    const points = values.map((v,i)=>`${pad+i/Math.max(values.length-1,1)*(w-pad-12)},${h-24-(v-lo)/span*(h-38)}`).join(" ");
+    body.replaceChildren(el("div",{class:"card"},[
+      el("svg",{width:w,height:h},[
+        el("line",{x1:pad,y1:h-24,x2:w-12,y2:h-24,class:"ax"}),
+        el("polyline",{points,fill:"none",stroke:PAL[0],"stroke-width":2}),
+        el("text",{x:4,y:16,class:"tick"},[fmt(hi)]),
+        el("text",{x:4,y:h-24,class:"tick"},[fmt(lo)])
+      ])
+    ]));
+  };
+  runSelect.onchange = draw; metricSelect.onchange = draw;
+  app.appendChild(runSelect); app.appendChild(metricSelect); app.appendChild(body); draw();
+}
+
+// --- поведение policy на фиксированных кадрах
+if (DATA.actions.length) {
+  app.appendChild(el("h2",{},["Action chunks на фиксированных кадрах"]));
+  app.appendChild(el("p",{class:"note"},["Линия показывает среднюю абсолютную ошибку каждого из 50 действий chunk. В JSON рядом лежат все семь координат target и prediction."]));
+  const select = el("select",{});
+  DATA.actions.forEach((d,i)=>select.appendChild(el("option",{value:i},[d.name])));
+  const body = el("div",{});
+  const draw = () => {
+    body.replaceChildren();
+    for (const sample of DATA.actions[+select.value].samples) {
+      const values = sample.absolute_error_by_step, w=300, h=90, pad=8;
+      const max = Math.max(...values, 1e-6);
+      const points = values.map((v,i)=>`${pad+i/(values.length-1)*(w-2*pad)},${h-pad-v/max*(h-2*pad)}`).join(" ");
+      const svg = el("svg",{width:w,height:h},[el("polyline",{points,fill:"none",stroke:PAL[0],"stroke-width":2})]);
+      body.appendChild(el("div",{class:"card",style:"margin:8px 8px 0 0"},[
+        el("b",{},[`episode ${sample.episode}, frame ${sample.frame}`]), svg
+      ]));
+    }
+  };
+  select.onchange = draw; app.appendChild(select); app.appendChild(body); draw();
+}
+
+if (DATA.transitions.length) {
+  app.appendChild(el("h2",{},["Latent transitions"]));
+  const t = el("table",{},[el("tr",{},["run","episode / frame","mean cosine","raw tensors"].map(x=>el("th",{},[x]))) ]);
+  for (const d of DATA.transitions) {
+    const flat = d.cosine_by_step_and_view.flat();
+    const mean = flat.reduce((a,b)=>a+b,0)/flat.length;
+    t.appendChild(el("tr",{},[d.name,`${d.episode} / ${d.frame}`,fmt(mean),d.raw_tensors].map(x=>el("td",{},[String(x)]))));
+  }
+  app.appendChild(t);
+}
+
 // --- все ячейки
 {
   app.appendChild(el("h2",{},["Каждая измеренная ячейка"]));
-  app.appendChild(el("p",{class:"note"},["При 20 эпизодах один успех — это 0.05. "
-    + "Разница меньше 0.1 между двумя ячейками ничего не значит."]));
+  app.appendChild(el("p",{class:"note"},["Число эпизодов указано для каждой ячейки. Предварительные прогоны на пяти эпизодах не являются финальной оценкой."]));
   const t = el("table",{},[el("tr",{},["метод","задача","демо","эпизодов","success","политика"]
     .map(x=>el("th",{},[x])))]);
   for (const r of DATA.rows)
@@ -115,31 +174,43 @@ if (DATA.failures.length) {
 
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("results", nargs="?", default="runs/results.jsonl")
-    p.add_argument("--out", default="runs/report.html")
-    p.add_argument("--only", nargs="+", default=None, help="какие методы показывать на кривой")
-    p.add_argument("--fail-runs", nargs="+", default=["fixed_n25"],
-                   help="из каких оценок брать кадры провалов")
-    p.add_argument("--n-fails", type=int, default=3)
-    args = p.parse_args()
-
-    rows = [json.loads(x) for x in pathlib.Path(args.results).read_text().splitlines() if x.strip()]
-    curve = cost_curve.load(args.results)
-    if args.only:
-        curve = {m: v for m, v in curve.items() if m in args.only}
-    picked = [e for e in rollouts.episodes() if e[0] in args.fail_runs]
+    results = pathlib.Path("runs/results.jsonl")
+    rows = [json.loads(x) for x in results.read_text().splitlines() if x.strip()] if results.exists() else []
+    curve = cost_curve.load(results) if results.exists() else {}
+    picked = [e for e in rollouts.episodes() if e[0] in ["fixed_n25"]]
     failures = []
-    for run, _, episode, ok, path in ([e for e in picked if not e[3]][: args.n_fails]
+    for run, _, episode, ok, path in ([e for e in picked if not e[3]][:3]
                                       + [e for e in picked if e[3]][:1]):
         images, _ = rollouts.frames(path, 4)
         failures.append({"run": run, "episode": episode, "ok": ok,
                          "frames": [rollouts.as_data_uri(f) for f in images]})
 
-    data = {"curve": {m: {str(n): v for n, v in d.items()} for m, d in curve.items()},
-            "rows": rows, "failures": failures}
-    pathlib.Path(args.out).write_text(TEMPLATE.replace("__DATA__", json.dumps(data, ensure_ascii=False)))
-    print(f"{len(curve)} методов, {len(rows)} ячеек, {len(failures)} роллаутов -> {args.out}")
+    diagnostics = pathlib.Path("runs/diagnostics")
+    actions = [
+        {"name": path.stem.removesuffix("_actions"), "samples": json.loads(path.read_text())}
+        for path in sorted(diagnostics.glob("*_actions.json"))
+    ]
+    transitions = []
+    for path in sorted(diagnostics.glob("*_transitions.json")):
+        row = json.loads(path.read_text())
+        row["name"] = path.stem.removesuffix("_transitions")
+        transitions.append(row)
+    training = []
+    for path in sorted(pathlib.Path("runs").glob("*/metrics.jsonl")):
+        values = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        if values:
+            training.append({"name": path.parent.name, "rows": values})
+    data = {
+        "curve": {m: {str(n): v for n, v in d.items()} for m, d in curve.items()},
+        "rows": rows,
+        "failures": failures,
+        "actions": actions,
+        "transitions": transitions,
+        "training": training,
+    }
+    output = pathlib.Path("runs/report.html")
+    output.write_text(TEMPLATE.replace("__DATA__", json.dumps(data, ensure_ascii=False)))
+    print(f"{len(curve)} методов, {len(rows)} ячеек, {len(failures)} роллаутов -> {output}")
 
 
 if __name__ == "__main__":

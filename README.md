@@ -20,20 +20,18 @@ Linux + GPU (полные прогоны):
 export MUJOCO_GL=egl
 ```
 
-## Cost curve
+## Запуск
 
 ```bash
-python demo_subset.py --task-index <i> --n 5          # первые 5 демо целевой задачи
-python baseline.py train --episodes <...> --tag base_t0_n5 --seed 0
-python baseline.py eval --policy outputs/base_t0_n5/checkpoints/last/pretrained_model \
-                        --task-id 0 --method baseline --n-demos 5 --seed 0
-python cost_curve.py runs/results.jsonl --plot
+python run_preliminary.py
+python viz.py
 ```
 
-Все точки копятся в `runs/results.jsonl`; график — `runs/cost_curve.png`.
+`run_preliminary.py` последовательно запускает короткий MPS-отсев. Методы собраны в
+`vla/methods.py`, явный optimizer loop находится в `vla/training.py`. Параметры
+написаны в Python, CLI-флагов обучения нет.
 
-Метрики — в локальный MLflow (`sqlite:///mlflow.db`):
-
-```bash
-mlflow ui --backend-store-uri sqlite:///mlflow.db
-```
+Каждый шаг пишется в `runs/<run>/metrics.jsonl`, конфигурация и статус в
+`runs/<run>/run.json`. Оценки лежат в `runs/results.jsonl`, action chunks и latent
+transitions в `runs/diagnostics/`. На CUDA те же значения дополнительно уходят в
+ClearML. W&B и MLflow не используются.

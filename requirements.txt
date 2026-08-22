@@ -7,7 +7,7 @@ matplotlib
 pillow
 imageio
 tqdm
-# demo_subset.py требует lerobot: pip install -e "ext/lerobot[dataset]"
+# код экспериментов требует lerobot: pip install -e "ext/lerobot[dataset]"
 # обучение и LIBERO-оценка: setup_gpu.sh на Linux + GPU
-mlflow
+clearml
 peft
