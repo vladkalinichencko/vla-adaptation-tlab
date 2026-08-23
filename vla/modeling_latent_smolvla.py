@@ -89,13 +89,30 @@ class LatentSmolVLAPolicy(SmolVLAPolicy):
         visual = self._visual_features(batch)
         predicted = self._predict_transitions(visual, self._language_feature(batch))
         target = (visual[:, 1:] - visual[:, :-1]).to(predicted.dtype)
-        loss = F.mse_loss(predicted, target)
-        cosine = F.cosine_similarity(predicted.flatten(3), target.flatten(3), dim=-1).mean()
+        keys = [key for key in self.config.image_features if key in batch]
+        padding = batch.get(f"{keys[0]}_is_pad")
+        valid = torch.ones(target.shape[:2], dtype=torch.bool, device=target.device)
+        if padding is not None:
+            valid = ~(padding[:, 1:] | padding[:, :-1])
+        transition_mask = valid[:, :, None, None, None]
+        loss = (((predicted - target) ** 2) * transition_mask).sum() / (
+            valid.sum() * target.shape[2] * target.shape[3] * target.shape[4]
+        ).clamp_min(1)
+        token_mask = valid[:, :, None]
+        cosine_values = F.cosine_similarity(predicted.flatten(3), target.flatten(3), dim=-1)
+        cosine = (cosine_values * token_mask).sum() / (
+            valid.sum() * target.shape[2]
+        ).clamp_min(1)
+        norm_count = (valid.sum() * target.shape[2] * target.shape[3]).clamp_min(1)
         return loss, {
             "transition_loss": loss.item(),
             "transition_cosine": cosine.item(),
-            "target_delta_norm": target.norm(dim=-1).mean().item(),
-            "predicted_delta_norm": predicted.norm(dim=-1).mean().item(),
+            "target_delta_norm": (
+                (target.norm(dim=-1) * valid[:, :, None, None]).sum() / norm_count
+            ).item(),
+            "predicted_delta_norm": (
+                (predicted.norm(dim=-1) * valid[:, :, None, None]).sum() / norm_count
+            ).item(),
         }
 
     def _action_loss(self, batch: dict[str, Tensor]):
