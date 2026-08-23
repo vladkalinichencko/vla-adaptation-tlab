@@ -1,0 +1,38 @@
+{
+  "status": "completed",
+  "method": "continuous LAPO-style inverse and forward model",
+  "latent_dim": 32,
+  "fixed_episode": 0,
+  "fixed_indices": [
+    0,
+    10,
+    20
+  ],
+  "steps": 1000,
+  "lr": 0.001,
+  "initial": {
+    "loss": 3.666292190551758,
+    "zero_loss": 3.665703058242798,
+    "shuffled_loss": 3.666293223698934,
+    "cosine": 0.0006017493433319032,
+    "latent_norm": 17.007715225219727
+  },
+  "final": {
+    "step": 1000,
+    "loss": 0.5647342403729757,
+    "zero_loss": 2.660123904546102,
+    "shuffled_loss": 0.6791905164718628,
+    "cosine": 0.8826057314872742,
+    "latent_norm": 94.7814203898112
+  },
+  "latent_policy_final": {
+    "step": 1000,
+    "loss": 0.0022441818728111684,
+    "cosine": 0.9999962051709493
+  },
+  "action_mae": {
+    "true_latent": 0.36696391304334003,
+    "predicted_latent": 0.3694889545440674,
+    "zero_latent": 0.5627522071202596
+  }
+}

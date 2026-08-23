@@ -141,7 +141,7 @@
 - Один раз на запуск: dataset repo и revision, episode IDs, device, dtype, batch, workers, seed, optimizer, scheduler и число обучаемых параметров.
 - На каждом шаге: loss и его части, gradient norm, LR выполненного шага, LR следующего шага, время и samples/s.
 - Для обычной VLA: target и predicted action chunks на фиксированных кадрах, ошибка по 50 шагам, rollout success и видео.
-- Для latent-метода: transition loss, cosine, нормы настоящего и предсказанного (z), actions из настоящего, предсказанного, нулевого и переставленного (z).
+- Для latent-метода: forward reconstruction loss, cosine, норма (z), zero/shuffled-(z) controls и actions из настоящего, предсказанного и нулевого (z).
 
 Гиперпараметры сохраняются для воспроизводимости, но не считаются диагностикой поведения.
 
@@ -168,24 +168,27 @@
 | 10. LoRA r=32, LR 1e-3 | Задача 2 | [метод](vla/methods.py), [test](tmp/lora_training_boundary.py) | завершён | [метрики](runs/preliminary_lora_r32_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_lora_r32_t0_n5_s0/eval_info.json) | loss 1.707 → 0.711; success 0/5 | [action chunks](runs/diagnostics/preliminary_lora_r32_t0_n5_s0_actions.json) |
 | 11. Action chunk 10 | Задача 2 | [метод](vla/methods.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_chunk_10_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_chunk_10_t0_n5_s0/eval_info.json) | loss 2.009 → 1.075; success 0/5 | [action chunks](runs/diagnostics/preliminary_chunk_10_t0_n5_s0_actions.json) |
 | 12. Аугментации изображений | Задача 2 | [метод](vla/methods.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_image_augmentations_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_image_augmentations_t0_n5_s0/eval_info.json) | loss 1.713 → 0.693; success 0/5 | [action chunks](runs/diagnostics/preliminary_image_augmentations_t0_n5_s0_actions.json), [кадры](runs/diagnostics/augmentations/metadata.json) |
-| 13. Latent transition и decoder с seen actions | `OWNER_NOTES.md` | [policy](vla/modeling_latent_smolvla.py), [очередь](run_preliminary.py) | завершён | [transition](runs/preliminary_latent_transition/metrics.jsonl), [decoder](runs/preliminary_latent_seen_decoder/metrics.jsonl), [eval](eval_logs/preliminary_latent_seen_actions_t0_n5_s0/eval_info.json) | transition loss 1.989 → 1.167; success 0/5 | [latent](runs/diagnostics/preliminary_latent_transition_transitions.json), [actions](runs/diagnostics/preliminary_latent_seen_actions_t0_n5_s0_actions.json) |
-| 14. Latent transition без seen actions | Bonus A | [policy](vla/modeling_latent_smolvla.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_latent_video_only_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_latent_video_only_t0_n5_s0/eval_info.json) | loss 0.289 → 0.273; success 0/5 | [action controls](runs/diagnostics/preliminary_latent_video_only_t0_n5_s0_actions.json) |
-| 15. Tiny-set overfit latent | capacity и wiring gate перед A100 | [диагностика](tmp/latent_tiny_overfit.py) | завершён | [run](runs/latent_tiny_overfit/run.json), [динамика](runs/latent_tiny_overfit/metrics.jsonl) | cosine -0.0001 → 0.274; true-latent action MAE 0.006; predicted 0.126; zero 0.110 | true, predicted, zero и reversed latent; reversal меняет actions на 0.147 |
+| 13. Raw visual-residual с seen actions | первая версия из `OWNER_NOTES.md` | [запуск](runs/preliminary_latent_transition/metrics.jsonl), реализация заменена | завершён, метод отклонён | [decoder](runs/preliminary_latent_seen_decoder/metrics.jsonl), [eval](eval_logs/preliminary_latent_seen_actions_t0_n5_s0/eval_info.json) | transition loss 1.989 → 1.167; success 0/5 | [latent](runs/diagnostics/preliminary_latent_transition_transitions.json), [actions](runs/diagnostics/preliminary_latent_seen_actions_t0_n5_s0_actions.json) |
+| 14. Raw visual-residual без seen actions | первая версия Bonus A | [исторический запуск](runs/preliminary_latent_video_only_t0_n5_s0/metrics.jsonl) | завершён, метод отклонён | [eval](eval_logs/preliminary_latent_video_only_t0_n5_s0/eval_info.json) | loss 0.289 → 0.273; success 0/5 | [action controls](runs/diagnostics/preliminary_latent_video_only_t0_n5_s0_actions.json) |
+| 15. Tiny-set raw visual-residual | capacity и wiring gate | [диагностика](tmp/latent_tiny_overfit.py) | gate не пройден | [run](runs/latent_tiny_overfit/run.json), [динамика](runs/latent_tiny_overfit/metrics.jsonl) | cosine -0.0001 → 0.274; predicted-latent action MAE 0.126 хуже zero 0.110 | true, predicted, zero и reversed latent |
 | 16. Изоляция ошибки latent predictor | проверка target и ёмкости | [tokenwise](tmp/latent_failure_diagnosis.py), [pooled](tmp/latent_pooled_head_diagnosis.py) | завершена | [tokenwise](runs/latent_failure_diagnosis), [pooled](runs/latent_pooled_head_diagnosis/run.json) | одно окно: cosine 0.591; три окна с pooling: 0.469; pooling до predictor: 0.446 | текущая голова не запоминает даже один 50-step tokenwise target; pooling не устраняет проблему |
+| 17. Continuous LAPO tiny-set | новая реализация Bonus A | [policy](vla/modeling_latent_smolvla.py), [диагностика](tmp/lapo_tiny_overfit.py) | representation и wiring gates пройдены | [полный путь](runs/lapo_pipeline_tiny_overfit/run.json) | cosine 0.883; MSE true/zero/shuffled \(z\): 0.565/2.660/0.679; policy cosine 0.999996; action MAE true/predicted/zero: 0.367/0.369/0.563 | [representation dynamics](runs/lapo_pipeline_tiny_overfit/metrics.jsonl), [policy dynamics](runs/lapo_pipeline_tiny_overfit/policy_metrics.jsonl) |
+| 18. Continuous LAPO training boundary | общий training loop и checkpoint handoff | [boundary](tmp/lapo_training_boundary.py) | MPS representation не прошла | [run](runs/lapo_boundary_representation/run.json), [failure](runs/lapo_boundary_representation/failure.json) | `SIGABRT` до первой метрики с batch 2, затем с batch 1, workers 0 и vision encode batch 1 | tiny-run стабилен после удаления frozen VLM; полный backward держит VLM и token activations одновременно |
 
 У всех вариантов training loss снизился, но каждый получил success 0/5. Всего получено 0 успехов в 55 предварительных rollout-эпизодах. Seen-претрен здесь длился только 100 шагов, поэтому этот отсев проверяет код и короткую динамику, но не оценивает полноценную адаптацию после обучения на `libero_90`.
 
 - На трёх фиксированных кадрах из target-демонстраций action MAE равен 0.136 у fine-tune на 200 шагов, 0.179 у полного размораживания и 0.196 у наивного fine-tune на 100 шагов. Это измеряет запоминание обучающих демонстраций, а не rollout-обобщение.
 - LoRA, chunk 10, аугментации и подмешивание seen не улучшили action MAE относительно наивного fine-tune в этом коротком прогоне: 0.208, 0.187, 0.199 и 0.210 соответственно.
-- У latent transition средний cosine с настоящим visual-token transition равен 0.0003. Перестановка 50 предсказанных transition-шагов меняет decoded actions в среднем на 0.000003. Текущая latent-ветка не показывает, что выучила направление перехода или порядок будущих шагов; увеличивать её бюджет без отдельного разбора нельзя.
+- У отклонённого raw-residual predictor средний cosine с настоящим visual-token transition равен 0.0003. Перестановка 50 предсказанных transition-шагов меняет decoded actions в среднем на 0.000003.
 - Tiny-set test отделил decoder от predictor. Линейный decoder запомнил actions из настоящего latent до MAE 0.006 и реагирует на перестановку шагов. Predictor не запомнил три фиксированных окна: cosine остановился на 0.274, а predicted-latent MAE 0.126 хуже zero-latent MAE 0.110. Большой latent-прогон не запускается до нового согласованного predictor.
 - Изоляция predictor показала, что проблема не сводится к spatial token loss. Текущая голова не запомнила один tokenwise window за 1000 шагов, cosine 0.591. Усреднение 64 visual tokens до loss или до predictor дало cosine 0.469 и 0.446 на трёх окнах.
 - Transition loss не использовал image padding mask. При равномерной выборке кадров 17.15% 50-step transition targets в `libero_90` выходили за конец эпизода и становились нулевыми из-за повторения последнего кадра. [Loss](vla/modeling_latent_smolvla.py) теперь исключает переход, если один из двух кадров padded; [boundary test](tmp/latent_padding_boundary.py) пройден.
-- Текущая схема не повторяет механизм [LAPO](https://arxiv.org/abs/2312.10812). В LAPO inverse model получает соседние кадры, передаёт сжатый latent во forward model, а восстановление следующего кадра заставляет latent хранить переход. Наш код напрямую задаёт latent как полный visual-token residual; learned bottleneck и forward model отсутствуют.
+- Новая схема повторяет нужный механизм [LAPO](https://arxiv.org/abs/2312.10812), но использует непрерывный \(z\in\mathbb{R}^{32}\) вместо VQ. Inverse model получает соседние frozen visual tokens, forward model восстанавливает их разность, latent policy предсказывает 50 \(z\) из первого кадра и инструкции, linear decoder выдаёт 50 actions.
+- На трёх фиксированных окнах LAPO representation снизила MSE с 3.666 до 0.565. Zero \(z\) дал 2.660, shuffled \(z\) 0.679, поэтому forward model использует bottleneck. Latent policy запомнила targets с cosine 0.999996. Action MAE с предсказанным \(z\) 0.369 почти совпал с настоящим \(z\) 0.367 и лучше нулевого \(z\) 0.563.
 
-Tiny-set overfit latent-ветки завершён. Decoder прошёл gate, predictor не прошёл. Большой latent-прогон не запускается.
+Continuous LAPO прошёл tiny-set representation и wiring gates. Следующий latent-запуск выполняется только на A100 по зафиксированной матрице.
 
-На A100 остаются обязательный наивный baseline, подмешивание seen и LoRA. Chunk 10, полное размораживание, удвоенная длительность и аугментации исключены владельцем. Наивный fine-tune не является кандидатом, но остаётся обязательной точкой отсчёта из Задачи 1. Latent Bonus A добавляется только после успешного tiny-set overfit.
+На A100 остаются обязательный наивный baseline, подмешивание seen, LoRA и прошедший gate Continuous LAPO Bonus A. Chunk 10, полное размораживание, удвоенная длительность и аугментации исключены владельцем. Наивный fine-tune не является кандидатом, но остаётся обязательной точкой отсчёта из Задачи 1.
 
 ### Финальные прогоны
 
@@ -218,7 +221,7 @@ Seen-претрен использует тот же AdamW с LR 1e-4, 1000 warm
 | 4. Наивный fine-tune cost curve | обязательный baseline | `run_final.py` | код не написан |  |  | 18 training cells, action chunks и видео |
 | 5. Подмешивание seen | кандидат Задачи 2 | `run_final.py` | код не написан |  |  | 18 cells и одинаковая target-экспозиция |
 | 6. LoRA r=32 | кандидат Задачи 2 | `run_final.py` | код не написан |  |  | 18 cells и фактические adapter targets |
-| 7. Latent Bonus A | Задача 4 | `run_final.py` | predictor не прошёл tiny-set gate |  |  | нужен новый согласованный predictor, затем повтор gate |
+| 7. Continuous LAPO Bonus A | Задача 4 | [policy](vla/modeling_latent_smolvla.py), `run_final.py` | tiny-set gate пройден; финальный launcher не написан |  |  | representation, zero/shuffled latent, policy cosine, action controls и rollout success |
 | 8. Три характерных провала | Задача 3 | [rollouts](rollouts.py), [HTML](viz.py) | ждёт финальные rollout-ы |  |  | видео и различающий эксперимент для каждого фейла |
 
 ### Что показывают старые proxy-прогоны
@@ -247,7 +250,7 @@ LoRA действительно обучалась с эффективным LR 
 - Перестановка 50 latent-шагов не требовалась заданием и не заменяет rollout success. Это наш causal control для выбранной архитектуры: если перестановка будущих переходов не меняет соответствующие actions, весь latent-путь не использует временной порядок chunk.
 - HTML строится только из JSON реальных запусков. Отсутствующие значения показываются как `not recorded`.
 
-## Проверенный метод латентного изменения кадров
+## Отклонённый raw visual-residual predictor
 
 Замороженный visual encoder SmolVLA кодирует два соседних наблюдения:
 
@@ -278,8 +281,8 @@ $$
 ### Отфильтрованные варианты
 
 - CLAP-подобный encoder \(a\to z\) не делаем. И он, и прямой decoder \(z\to a\) используют action labels для одной связи; contrastive направление добавляет модель и loss, но не проверяет другой вопрос.
-- Action bottleneck \((o,\text{text})\to z\to a\) является общей схемой выбранного метода, а не отдельным экспериментом.
-- Dynamics-aware representation является целью того же \(z_t=h_{t+1}-h_t\), а не вторым методом. Отдельный world-model loss пока не добавляем.
+- Action bottleneck \((o,\text{text})\to z\to a\) является общей схемой Continuous LAPO, а не отдельным экспериментом.
+- Dynamics-aware representation является общим названием для inverse и forward обучения выбранного \(z\), а не вторым методом.
 - VQ и дальний переход \(t+k\) не используем по решению владельца. Работаем с непрерывной разницей соседних visual tokens.
 - Разность robot states может сильнее коррелировать с action, но для Bonus A она использует proprioception вместо заявленного видео и почти восстанавливает управляющий сигнал. Её можно оставить только как контроль верхней границы.
 - Progress representation и TimeRewarder относятся к Bonus B. Они измеряют выполнение задачи, а не удешевляют привязку движения к action.
@@ -287,10 +290,24 @@ $$
 
 Предсказание владельца: выигрыш video representation должен быть максимален на 5 демо, а к 25 демо наивный fine-tune может частично догнать. Старый proxy ставит подмешивание первым кандидатом на повтор; он не позволяет заранее объявить его победителем на правильном split.
 
+## Continuous LAPO
+
+Замороженный visual encoder кодирует соседние кадры в \(h_t,h_{t+1}\). Inverse model сжимает их в непрерывный \(z_t\in\mathbb{R}^{32}\):
+
+$$
+E(h_t,h_{t+1})=z_t.
+$$
+
+Forward model получает \(h_t,z_t\) и восстанавливает \(\Delta h_t=h_{t+1}-h_t\). Единственный representation loss равен masked MSE между предсказанной и настоящей разностью visual tokens. Cosine, нормы, zero \(z\) и shuffled \(z\) служат диагностикой, а не дополнительными loss.
+
+После representation pretrain latent policy предсказывает chunk из 50 латентов по первому кадру и инструкции. Linear decoder \(32\to7\) переводит каждый latent в штатное действие. В основном варианте decoder сначала видит actions seen-демонстраций. В Bonus A он впервые видит actions только в разрешённых 5/10/25 target-демонстрациях.
+
+CLAP-подобный encoder \(a\to z\) не нужен. Он связывает те же action labels с тем же \(z\), только в обратном направлении, и добавляет отдельную модель и loss без нового исследовательского вопроса.
+
 ## Открытые решения
 
 1. Для подмешивания сохраняется правило: число показов target-примеров совпадает с наивным fine-tune, поэтому число optimizer steps увеличивается пропорционально размеру смеси.
-2. Для latent-метода нужно выбрать между прямой разностью frozen visual tokens и learned continuous bottleneck с inverse и forward model. VQ остаётся исключённым по решению владельца.
+2. Число шагов representation, latent-policy и decoder на A100 нужно зафиксировать до запуска. Архитектура и loss уже согласованы; VQ исключён.
 
 ## Предсказания
 

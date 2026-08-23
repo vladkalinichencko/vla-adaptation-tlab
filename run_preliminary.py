@@ -113,24 +113,31 @@ def adapt(method, seen_checkpoint: Path, runtime):
 
 
 def run_latent(runtime):
-    transition = fit(
-        "preliminary_latent_transition",
-        load_latent_policy(BASE_POLICY, BASE_POLICY_REVISION, runtime, "transition"),
+    representation = fit(
+        "preliminary_lapo_representation",
+        load_latent_policy(BASE_POLICY, BASE_POLICY_REVISION, runtime, "representation"),
         dataset(SEEN_SOURCE),
         runtime,
         LATENT_STEPS,
     )
     transition_snapshot(
-        "preliminary_latent_transition",
-        transition,
+        "preliminary_lapo_representation",
+        representation,
         SEEN_SOURCE,
         balanced_seen_episodes(1),
         runtime,
     )
 
+    latent_policy = fit(
+        "preliminary_lapo_policy",
+        load_latent_policy(representation, None, runtime, "policy"),
+        dataset(SEEN_SOURCE),
+        runtime,
+        LATENT_STEPS,
+    )
     seen_decoder = fit(
-        "preliminary_latent_seen_decoder",
-        load_latent_policy(transition, None, runtime, "action"),
+        "preliminary_lapo_seen_decoder",
+        load_latent_policy(latent_policy, None, runtime, "action"),
         dataset(SEEN_SOURCE),
         runtime,
         LATENT_STEPS,
@@ -138,20 +145,20 @@ def run_latent(runtime):
     target = dataset(TARGET_SOURCE, first_target_episodes(0, 5))
 
     checkpoint = fit(
-        "preliminary_latent_seen_actions_t0_n5_s0",
+        "preliminary_lapo_seen_actions_t0_n5_s0",
         load_latent_policy(seen_decoder, None, runtime, "action"),
         target,
         runtime,
     )
-    evaluate_once("preliminary_latent_seen_actions_t0_n5_s0", checkpoint, "latent_seen_actions", runtime)
+    evaluate_once("preliminary_lapo_seen_actions_t0_n5_s0", checkpoint, "lapo_seen_actions", runtime)
 
     checkpoint = fit(
-        "preliminary_latent_video_only_t0_n5_s0",
-        load_latent_policy(transition, None, runtime, "action"),
+        "preliminary_lapo_video_only_t0_n5_s0",
+        load_latent_policy(latent_policy, None, runtime, "action"),
         target,
         runtime,
     )
-    evaluate_once("preliminary_latent_video_only_t0_n5_s0", checkpoint, "latent_video_only", runtime)
+    evaluate_once("preliminary_lapo_video_only_t0_n5_s0", checkpoint, "lapo_video_only", runtime)
 
 
 def main():

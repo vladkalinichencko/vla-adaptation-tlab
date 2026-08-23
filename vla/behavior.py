@@ -98,11 +98,11 @@ def action_snapshot(
         torch.manual_seed(0)
         with torch.no_grad():
             batch = preprocessor(lerobot_collate_fn([item]))
-            if hasattr(policy, "transition_head"):
+            if hasattr(policy, "latent_policy"):
                 visual = policy._visual_features(batch)
-                latent = policy._predict_transitions(visual, policy._language_feature(batch))
+                latent = policy.latent_policy(visual[:, 0], policy._language_feature(batch))
                 action_dim = policy.config.action_feature.shape[0]
-                decoded = policy.action_decoder(latent.mean(dim=3).flatten(2))[..., :action_dim]
+                decoded = policy.action_decoder(latent)[..., :action_dim]
                 predicted = postprocessor(decoded)[0]
             else:
                 predicted = postprocessor(policy.predict_action_chunk(batch))[0]
@@ -114,13 +114,15 @@ def action_snapshot(
                 "predicted": predicted.tolist(),
                 "absolute_error_by_step": (predicted - item[ACTION]).abs().mean(dim=-1).tolist(),
             }
-            if hasattr(policy, "transition_head"):
-                zero = policy.action_decoder(torch.zeros_like(latent).mean(dim=3).flatten(2))[..., :action_dim]
-                reversed_steps = policy.action_decoder(latent.flip(1).mean(dim=3).flatten(2))[..., :action_dim]
-                true_latent = (visual[:, 1:] - visual[:, :-1]).to(policy.action_decoder.weight.dtype)
-                true_latent_actions = policy.action_decoder(true_latent.mean(dim=3).flatten(2))[..., :action_dim]
+            if hasattr(policy, "latent_policy"):
+                zero = policy.action_decoder(torch.zeros_like(latent))[..., :action_dim]
+                reversed_steps = policy.action_decoder(latent.flip(1))[..., :action_dim]
+                true_latent = policy.inverse_model(visual[:, :-1], visual[:, 1:]).to(
+                    policy.action_decoder.weight.dtype
+                )
+                true_latent_actions = policy.action_decoder(true_latent)[..., :action_dim]
                 row.update(
-                    latent_norm=latent.norm(dim=-1).mean(dim=(2, 3))[0].tolist(),
+                    latent_norm=latent.norm(dim=-1)[0].tolist(),
                     true_latent_actions=postprocessor(true_latent_actions)[0].tolist(),
                     zero_latent_actions=postprocessor(zero)[0].tolist(),
                     reversed_latent_actions=postprocessor(reversed_steps)[0].tolist(),
@@ -168,7 +170,9 @@ def transition_snapshot(
     with torch.no_grad():
         batch = preprocessor(lerobot_collate_fn([item]))
         visual = policy._visual_features(batch)
-        predicted = policy._predict_transitions(visual, policy._language_feature(batch))
+        current, next_frame = visual[:, :-1], visual[:, 1:]
+        latent = policy.inverse_model(current, next_frame)
+        predicted = policy.forward_model(current, latent)
         target = (visual[:, 1:] - visual[:, :-1]).to(predicted.dtype)
         cosine = torch.nn.functional.cosine_similarity(predicted, target, dim=-1).mean(dim=-1)
 
@@ -185,6 +189,7 @@ def transition_snapshot(
                 "target_norm_by_step_and_view": target.norm(dim=-1).mean(dim=-1)[0].cpu().tolist(),
                 "predicted_norm_by_step_and_view": predicted.norm(dim=-1).mean(dim=-1)[0].cpu().tolist(),
                 "cosine_by_step_and_view": cosine[0].cpu().tolist(),
+                "latent_norm_by_step": latent.norm(dim=-1)[0].cpu().tolist(),
                 "raw_tensors": str(raw),
             },
             indent=2,
