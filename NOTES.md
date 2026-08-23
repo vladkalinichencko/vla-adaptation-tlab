@@ -170,15 +170,16 @@
 | 12. Аугментации изображений | Задача 2 | [метод](vla/methods.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_image_augmentations_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_image_augmentations_t0_n5_s0/eval_info.json) | loss 1.713 → 0.693; success 0/5 | [action chunks](runs/diagnostics/preliminary_image_augmentations_t0_n5_s0_actions.json), [кадры](runs/diagnostics/augmentations/metadata.json) |
 | 13. Latent transition и decoder с seen actions | `OWNER_NOTES.md` | [policy](vla/modeling_latent_smolvla.py), [очередь](run_preliminary.py) | завершён | [transition](runs/preliminary_latent_transition/metrics.jsonl), [decoder](runs/preliminary_latent_seen_decoder/metrics.jsonl), [eval](eval_logs/preliminary_latent_seen_actions_t0_n5_s0/eval_info.json) | transition loss 1.989 → 1.167; success 0/5 | [latent](runs/diagnostics/preliminary_latent_transition_transitions.json), [actions](runs/diagnostics/preliminary_latent_seen_actions_t0_n5_s0_actions.json) |
 | 14. Latent transition без seen actions | Bonus A | [policy](vla/modeling_latent_smolvla.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_latent_video_only_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_latent_video_only_t0_n5_s0/eval_info.json) | loss 0.289 → 0.273; success 0/5 | [action controls](runs/diagnostics/preliminary_latent_video_only_t0_n5_s0_actions.json) |
-| 15. Tiny-set overfit latent | capacity и wiring gate перед A100 | [диагностика](tmp/latent_tiny_overfit.py) | заблокирован на MPS | метрик нет | Metal завершает процесс `SIGABRT` внутри `Linear`; метод не оценён | transition cosine, action MAE для true, predicted, zero и reversed latent |
+| 15. Tiny-set overfit latent | capacity и wiring gate перед A100 | [диагностика](tmp/latent_tiny_overfit.py) | завершён | [run](runs/latent_tiny_overfit/run.json), [динамика](runs/latent_tiny_overfit/metrics.jsonl) | cosine -0.0001 → 0.274; true-latent action MAE 0.006; predicted 0.126; zero 0.110 | true, predicted, zero и reversed latent; reversal меняет actions на 0.147 |
 
 У всех вариантов training loss снизился, но каждый получил success 0/5. Всего получено 0 успехов в 55 предварительных rollout-эпизодах. Seen-претрен здесь длился только 100 шагов, поэтому этот отсев проверяет код и короткую динамику, но не оценивает полноценную адаптацию после обучения на `libero_90`.
 
 - На трёх фиксированных кадрах из target-демонстраций action MAE равен 0.136 у fine-tune на 200 шагов, 0.179 у полного размораживания и 0.196 у наивного fine-tune на 100 шагов. Это измеряет запоминание обучающих демонстраций, а не rollout-обобщение.
 - LoRA, chunk 10, аугментации и подмешивание seen не улучшили action MAE относительно наивного fine-tune в этом коротком прогоне: 0.208, 0.187, 0.199 и 0.210 соответственно.
 - У latent transition средний cosine с настоящим visual-token transition равен 0.0003. Перестановка 50 предсказанных transition-шагов меняет decoded actions в среднем на 0.000003. Текущая latent-ветка не показывает, что выучила направление перехода или порядок будущих шагов; увеличивать её бюджет без отдельного разбора нельзя.
+- Tiny-set test отделил decoder от predictor. Линейный decoder запомнил actions из настоящего latent до MAE 0.006 и реагирует на перестановку шагов. Predictor не запомнил три фиксированных окна: cosine остановился на 0.274, а predicted-latent MAE 0.126 хуже zero-latent MAE 0.110. Большой latent-прогон не запускается до нового согласованного predictor.
 
-Перед A100 запускаем tiny-set overfit latent-ветки. Если predictor не запоминает три фиксированных перехода и decoder не начинает зависеть от latent, большой latent-прогон не запускается.
+Tiny-set overfit latent-ветки завершён. Decoder прошёл gate, predictor не прошёл. Большой latent-прогон не запускается.
 
 На A100 остаются обязательный наивный baseline, подмешивание seen и LoRA. Chunk 10, полное размораживание, удвоенная длительность и аугментации исключены владельцем. Наивный fine-tune не является кандидатом, но остаётся обязательной точкой отсчёта из Задачи 1. Latent Bonus A добавляется только после успешного tiny-set overfit.
 
@@ -213,7 +214,7 @@ Seen-претрен использует тот же AdamW с LR 1e-4, 1000 warm
 | 4. Наивный fine-tune cost curve | обязательный baseline | `run_final.py` | код не написан |  |  | 18 training cells, action chunks и видео |
 | 5. Подмешивание seen | кандидат Задачи 2 | `run_final.py` | код не написан |  |  | 18 cells и одинаковая target-экспозиция |
 | 6. LoRA r=32 | кандидат Задачи 2 | `run_final.py` | код не написан |  |  | 18 cells и фактические adapter targets |
-| 7. Latent Bonus A | Задача 4 | `run_final.py` | ждёт tiny-set overfit |  |  | cost curve, cosine, zero и reversed latent controls |
+| 7. Latent Bonus A | Задача 4 | `run_final.py` | predictor не прошёл tiny-set gate |  |  | нужен новый согласованный predictor, затем повтор gate |
 | 8. Три характерных провала | Задача 3 | [rollouts](rollouts.py), [HTML](viz.py) | ждёт финальные rollout-ы |  |  | видео и различающий эксперимент для каждого фейла |
 
 ### Что показывают старые proxy-прогоны
@@ -230,6 +231,7 @@ LoRA действительно обучалась с эффективным LR 
 
 - Конвертер останавливается при несовпадении размеров массивов, пропавших файлах, NaN и неверном числе эпизодов. Это проверка корректности, а не диагностика эксперимента.
 - Каждый запуск сохраняет применённые dataset revision, task и episode IDs, device, dtype, batch size, workers, seed, optimizer, LR, scheduler, обучаемые параметры и новый checkpoint. Это проверяет, что LeRobot не перезаписал настройки своим preset.
+- [Первый tiny-set запуск](tmp/latent_tiny_overfit_console.log) падал в Metal из-за `bfloat16` visual tokens и `float32` transition head. Диагностический код теперь приводит cached tokens к dtype головы. Основная модель не менялась.
 - Методы сравниваются на одинаковых task IDs, init states, eval seeds и числе эпизодов. Короткий отсев помечается отдельно от финального результата.
 
 ## Диагностика поведения
