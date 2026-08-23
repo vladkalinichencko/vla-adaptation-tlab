@@ -39,3 +39,18 @@ mlruns/
 mlartifacts/
 
 # logs/, runs/ и tmp/ содержат доказательства и отслеживаются
+
+# служебные инструкции агентов
+AGENTS.md
+CLAUDE.md
+
+# crash-лог MuJoCo
+MUJOCO_LOG.TXT
+
+# сырые eval-логи прогонов: агрегаты вшиты в runs/report.html
+tmp/*.log
+runs/**/*.jsonl
+runs/**/tokenizer/
+
+# автоматизация и wiring-проверки: проверяющим не нужны
+tmp/

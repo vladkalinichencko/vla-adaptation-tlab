@@ -1,1 +1,0 @@
-{"step": 1, "loss": 3.682116746902466, "grad_norm": 6.073262691497803, "lr": 0.001, "next_lr": 1e-05, "seconds": 1.5625785840675235, "samples_per_second": 0.6399678135847197, "losses_after_forward": 3.508239269256592, "losses_after_in_ep_bound": 2.6511240005493164, "losses_after_rm_padding": 2.6511240005493164}

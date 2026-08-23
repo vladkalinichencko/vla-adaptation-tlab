@@ -223,7 +223,7 @@ Seen-претрен использует AdamW с LR 1e-4, 100 warmup steps и c
 | 4. Подмешивание seen | кандидат Задачи 2 | [A100 runner](../vla-a100/run_a100.py) | завершены 18 cells | [summary](runs/a100_final/7d5ef68ac4a84d4e8ad51126b3287c5e/summary.json) | mean success 0.742 / 0.817 / 0.917 при 5 / 10 / 25 демо | action chunks, 360 rollout-эпизодов и видео seed 0 |
 | 5. LoRA r=32 | кандидат Задачи 2 | [A100 runner](../vla-a100/run_a100.py) | завершены 18 cells | тот же summary | mean success 0.575 / 0.717 / 0.858 | action chunks, 360 rollout-эпизодов и видео seed 0 |
 | 6. Continuous LAPO Bonus A | Задача 4 | [policy](vla/modeling_latent_smolvla.py), [A100 runner](../vla-a100/run_a100.py) | завершён для 5 демо | тот же summary | success 0/60; representation loss 0.938 → 0.838; policy loss 10.262 → 0.188 | representation, zero/shuffled latent, policy cosine и action controls |
-| 7. Три характерных провала | Задача 3 | [rollouts](rollouts.py), [HTML](viz.py) | ждёт финальные rollout-ы |  |  | видео и различающий эксперимент для каждого фейла |
+| 7. Три характерных провала | Задача 3 | [rollouts](rollouts.py), [A100 HTML](runs/report.html) | rollout-ы скачаны, разбор не сделан | [120 видео](runs/a100_final/7d5ef68ac4a84d4e8ad51126b3287c5e) |  | выбрать три фейла и записать различающий эксперимент для каждого |
 
 Финальный запуск разделён на два последовательных task на одной A100 80 GB. Первый task сохранил seen-checkpoint и затем упал в BF16-диагностике после завершённого LAPO representation train. Второй task загрузил тот же checkpoint, прошёл исправленную диагностику и закончил всю матрицу. Они заняли 3240 и 15757 секунд, суммарно 5 ч 17 мин.
 
@@ -253,7 +253,7 @@ LoRA действительно обучалась с эффективным LR 
 - Гипотеза забывания проверяется на одних и тех же seen и target кадрах до и после target fine-tune. Сравниваются action chunks и роллауты.
 - Для метода представлений на одних фиксированных парах показываются настоящий \(z_t\), предсказанный \(\hat z_t\), action из настоящего \(z_t\) и action из \(\hat z_t\). Обнуление и перестановка \(z\) проверяют, использует ли decoder этот код. Проекции добавляются только после просмотра самих тензоров.
 - Перестановка 50 latent-шагов не требовалась заданием и не заменяет rollout success. Это наш causal control для выбранной архитектуры: если перестановка будущих переходов не меняет соответствующие actions, весь latent-путь не использует временной порядок chunk.
-- HTML строится только из JSON реальных запусков. Отсутствующие значения показываются как `not recorded`.
+- Итоговый [HTML](runs/report.html) строится только из финальных A100 JSONL, eval JSON, action snapshots и видео. Старые proxy и preliminary-прогоны в него не входят. Отсутствующее LAPO-видео показывается как `not recorded`.
 
 ## Отклонённый raw visual-residual predictor
 

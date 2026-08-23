@@ -1,19 +1,0 @@
-Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files: 100%|██████████| 4/4 [00:00<00:00, 2378.06it/s]
-=== trick_lora (5 демо: 399 405 410 421 437) ===
-  обучение exit=0
-  оценка exit=0 | success 0.0%  -> runs/results.jsonl
-Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files: 100%|██████████| 4/4 [00:00<00:00, 2328.23it/s]
-=== default_n10 (10 демо: 399 405 410 421 437 443 463 469 473 490) ===
-  обучение exit=0
-  оценка exit=0 | success 30.0%  -> runs/results.jsonl
-Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files: 100%|██████████| 4/4 [00:00<00:00, 2600.72it/s]
-=== default_n25 (25 демо: 399 405 410 421 437 443 463 469 473 490 496 497 516 519 525 541 547 552 561 566 577 585 599 611 631) ===
-  обучение exit=0
-  оценка exit=0 | success 15.0%  -> runs/results.jsonl
-
-=== кривая ===
- demos         zeroshot_base         trick_default        trick_unfrozen            trick_lora               default
-     0         0.000 ±0.000 (1)                     —                     —                     —                     —
-     5                     —         0.400 ±0.000 (1)         0.450 ±0.000 (1)         0.000 ±0.000 (1)                     —
-    10                     —                     —                     —                     —         0.300 ±0.000 (1)
-    25                     —                     —                     —                     —         0.150 ±0.000 (1)
