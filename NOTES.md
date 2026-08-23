@@ -273,7 +273,7 @@ $$
 
 Берём последние замороженные visual tokens, которые vision encoder передаёт в VLM. Predictor получает token текущего кадра, средний language embedding, номер будущего шага и номер камеры; общий двухслойный MLP предсказывает 50 последовательных token-deltas. Decoder учится на настоящих разностях соседних кадров, усредняет tokens внутри каждой камеры, конкатенирует две камеры и линейно выдаёт штатный chunk из 50 actions. На rollout будущих кадров нет, поэтому decoder получает предсказанные разности; все 50 actions исполняются до следующего планирования, как в baseline SmolVLA.
 
-Эта реализация не прошла tiny-set gate. Она просит один current frame предсказать полный 50-step residual размером (50\times2\times64\times960), хотя decoder затем усредняет 64 spatial tokens. На seen-training predicted norm упала с 6.24 до 1.31 при target norm 16.96–39.41: MSE ведёт predictor к почти нулевому среднему переходу.
+Эта реализация не прошла tiny-set gate. Она просит один current frame предсказать полный 50-step residual размером \(50\times2\times64\times960\), хотя decoder затем усредняет 64 spatial tokens. На seen-training predicted norm упала с 6.24 до 1.31 при target norm 16.96–39.41: MSE ведёт predictor к почти нулевому среднему переходу.
 
 ### Отфильтрованные варианты
 
