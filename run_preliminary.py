@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from vla.behavior import transition_snapshot
+from vla.behavior import augmentation_snapshot, transition_snapshot
 from vla.data import (
     BASE_POLICY,
     BASE_POLICY_REVISION,
@@ -158,6 +158,8 @@ def main():
     runtime = current_runtime()
     if not runtime.is_screening:
         raise RuntimeError("This file is only for the short MPS screening pass.")
+
+    augmentation_snapshot(TARGET_SOURCE, first_target_episodes(0, 1))
 
     seen_checkpoint = fit(
         "preliminary_seen_pretrain",

@@ -149,6 +149,11 @@
 
 Один MPS seed, одна target-задача, 5 демо, 5 eval-эпизодов. Обычные методы учатся 100 шагов, контроль длительности 200, latent-фазы 50; warmup равен 10 шагам. Эти числа нужны для сравнения динамики за короткий локальный прогон.
 
+- Наивный fine-tune обучает штатный action expert: 99.9M параметров, vision encoder заморожен.
+- Удвоенная длительность использует ту же модель и те же 99.9M параметров, но 200 шагов вместо 100.
+- Полное размораживание отключает expert-only и обучает 392.9M параметров, включая vision encoder; число шагов остаётся 100.
+- LoRA замораживает базовые веса и обучает 1.49M adapter-параметров за 100 шагов.
+
 | эксперимент | основание | код | статус | запуск | результат | диагностика |
 |---|---|---|---|---|---|---|
 | 1. Конверсия `libero_90` и `libero_goal` | данные из условия | [конвертер](tmp/convert_libero.py) | завершена | [seen](logs/libero_90_conversion.json), [target](logs/libero_goal_conversion.json) | 4500 seen и 500 target эпизодов; три target-задачи прочитаны | [кадры и pixel diff](runs/diagnostics/conversion_test.png) |
@@ -162,7 +167,7 @@
 | 9. Подмешивание seen | Задача 2, `OWNER_NOTES.md` | [data](vla/data.py), [очередь](run_preliminary.py) | завершён, target не прореживался | [метрики](runs/preliminary_mix_seen_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_mix_seen_t0_n5_s0/eval_info.json) | loss 1.352 → 0.806; success 0/5 | [action chunks](runs/diagnostics/preliminary_mix_seen_t0_n5_s0_actions.json) |
 | 10. LoRA r=32, LR 1e-3 | Задача 2 | [метод](vla/methods.py), [test](tmp/lora_training_boundary.py) | завершён | [метрики](runs/preliminary_lora_r32_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_lora_r32_t0_n5_s0/eval_info.json) | loss 1.707 → 0.711; success 0/5 | [action chunks](runs/diagnostics/preliminary_lora_r32_t0_n5_s0_actions.json) |
 | 11. Action chunk 10 | Задача 2 | [метод](vla/methods.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_chunk_10_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_chunk_10_t0_n5_s0/eval_info.json) | loss 2.009 → 1.075; success 0/5 | [action chunks](runs/diagnostics/preliminary_chunk_10_t0_n5_s0_actions.json) |
-| 12. Аугментации изображений | Задача 2 | [метод](vla/methods.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_image_augmentations_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_image_augmentations_t0_n5_s0/eval_info.json) | loss 1.713 → 0.693; success 0/5 | [action chunks](runs/diagnostics/preliminary_image_augmentations_t0_n5_s0_actions.json) |
+| 12. Аугментации изображений | Задача 2 | [метод](vla/methods.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_image_augmentations_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_image_augmentations_t0_n5_s0/eval_info.json) | loss 1.713 → 0.693; success 0/5 | [action chunks](runs/diagnostics/preliminary_image_augmentations_t0_n5_s0_actions.json), [кадры](runs/diagnostics/augmentations/metadata.json) |
 | 13. Latent transition и decoder с seen actions | `OWNER_NOTES.md` | [policy](vla/modeling_latent_smolvla.py), [очередь](run_preliminary.py) | завершён | [transition](runs/preliminary_latent_transition/metrics.jsonl), [decoder](runs/preliminary_latent_seen_decoder/metrics.jsonl), [eval](eval_logs/preliminary_latent_seen_actions_t0_n5_s0/eval_info.json) | transition loss 1.989 → 1.167; success 0/5 | [latent](runs/diagnostics/preliminary_latent_transition_transitions.json), [actions](runs/diagnostics/preliminary_latent_seen_actions_t0_n5_s0_actions.json) |
 | 14. Latent transition без seen actions | Bonus A | [policy](vla/modeling_latent_smolvla.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_latent_video_only_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_latent_video_only_t0_n5_s0/eval_info.json) | loss 0.289 → 0.273; success 0/5 | [action controls](runs/diagnostics/preliminary_latent_video_only_t0_n5_s0_actions.json) |
 

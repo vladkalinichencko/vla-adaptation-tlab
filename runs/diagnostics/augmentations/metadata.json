@@ -1,0 +1,108 @@
+{
+  "episode": 0,
+  "frame": 0,
+  "max_num_transforms": 3,
+  "available": {
+    "brightness": {
+      "type": "ColorJitter",
+      "range": {
+        "brightness": [
+          0.8,
+          1.2
+        ]
+      }
+    },
+    "contrast": {
+      "type": "ColorJitter",
+      "range": {
+        "contrast": [
+          0.8,
+          1.2
+        ]
+      }
+    },
+    "saturation": {
+      "type": "ColorJitter",
+      "range": {
+        "saturation": [
+          0.5,
+          1.5
+        ]
+      }
+    },
+    "hue": {
+      "type": "ColorJitter",
+      "range": {
+        "hue": [
+          -0.05,
+          0.05
+        ]
+      }
+    },
+    "sharpness": {
+      "type": "SharpnessJitter",
+      "range": {
+        "sharpness": [
+          0.5,
+          1.5
+        ]
+      }
+    },
+    "affine": {
+      "type": "RandomAffine",
+      "range": {
+        "degrees": [
+          -5.0,
+          5.0
+        ],
+        "translate": [
+          0.05,
+          0.05
+        ]
+      }
+    }
+  },
+  "samples": [
+    {
+      "name": "original",
+      "image": "original.png",
+      "transforms": []
+    },
+    {
+      "name": "seed 0",
+      "image": "seed_0.png",
+      "transforms": [
+        "contrast",
+        "saturation",
+        "sharpness"
+      ]
+    },
+    {
+      "name": "seed 1",
+      "image": "seed_1.png",
+      "transforms": [
+        "brightness",
+        "hue",
+        "affine"
+      ]
+    },
+    {
+      "name": "seed 2",
+      "image": "seed_2.png",
+      "transforms": [
+        "contrast",
+        "hue",
+        "affine"
+      ]
+    },
+    {
+      "name": "seed 3",
+      "image": "seed_3.png",
+      "transforms": [
+        "brightness",
+        "contrast",
+        "hue"
+      ]
+    }
+  ]
+}

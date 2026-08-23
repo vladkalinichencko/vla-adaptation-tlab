@@ -5,12 +5,55 @@ import torch
 from lerobot.datasets.factory import resolve_delta_timestamps
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.policies import make_policy, make_pre_post_processors
+from lerobot.transforms import ImageTransforms, ImageTransformsConfig
 from lerobot.utils.collate import lerobot_collate_fn
 from lerobot.utils.constants import ACTION
+from torchvision.utils import save_image
 
 from vla.data import RENAME, Source, metadata
 from vla.diagnostics import plain
 from vla.runtime import Runtime
+
+
+def augmentation_snapshot(source: Source, episodes: list[int]) -> Path:
+    data = LeRobotDataset(
+        source.repo_id,
+        root=source.root,
+        revision=source.revision,
+        episodes=episodes,
+        video_backend="pyav",
+    )
+    item = data[0]
+    image = item["observation.images.image"]
+    config = ImageTransformsConfig(enable=True)
+    pipeline = ImageTransforms(config)
+    names = {id(transform): name for name, transform in pipeline.transforms.items()}
+    output = Path("runs/diagnostics/augmentations")
+    output.mkdir(parents=True, exist_ok=True)
+    save_image(image, output / "original.png")
+
+    samples = [{"name": "original", "image": "original.png", "transforms": []}]
+    for seed in range(4):
+        torch.manual_seed(seed)
+        augmented = pipeline(image)
+        filename = f"seed_{seed}.png"
+        save_image(augmented, output / filename)
+        samples.append({
+            "name": f"seed {seed}",
+            "image": filename,
+            "transforms": [names[id(transform)] for transform in pipeline.tf.selected_transforms],
+        })
+
+    metadata_path = output / "metadata.json"
+    metadata_path.write_text(json.dumps({
+        "episode": int(item["episode_index"]),
+        "frame": int(item["frame_index"]),
+        "max_num_transforms": config.max_num_transforms,
+        "available": {name: {"type": value.type, "range": value.kwargs}
+                      for name, value in config.tfs.items()},
+        "samples": samples,
+    }, indent=2) + "\n")
+    return metadata_path
 
 
 def action_snapshot(
