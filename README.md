@@ -35,3 +35,13 @@ python viz.py
 `runs/<run>/run.json`. Оценки лежат в `runs/results.jsonl`, action chunks и latent
 transitions в `runs/diagnostics/`. На CUDA те же значения дополнительно уходят в
 ClearML. W&B и MLflow не используются.
+
+Финальный CUDA-runner находится в отдельной code-only ветке `vla-a100` и запускается без флагов:
+
+```bash
+cd ../vla-a100
+./setup_gpu.sh
+python run_a100.py
+```
+
+Он последовательно выполняет seen-претрен, zero-shot, wrong instruction, Continuous LAPO, seen-mix и LoRA. Итоговая матрица и ссылки на сырые артефакты записаны в [NOTES.md](NOTES.md), сводка лежит в `runs/a100_final/*/summary.json`, визуализация собирается командой `python viz.py`.

@@ -19,7 +19,7 @@ class TrainingObserver:
             from clearml import Task
 
             self.clearml = Task.current_task() or Task.init(project_name="VLA cost curve", task_name=name)
-            self.clearml.connect(self.config, name="run")
+            self.clearml.connect(plain(self.config), name=f"runs/{name}")
 
     def log(self, step: int, values: dict[str, Any]) -> None:
         row = {"step": step, **plain(values)}
@@ -65,6 +65,6 @@ def log_evaluation(name: str, row: dict[str, Any], device: str) -> None:
     from clearml import Task
 
     task = Task.current_task() or Task.init(project_name="VLA cost curve", task_name=name)
-    task.connect(plain(row), name="evaluation")
+    task.connect(plain(row), name=f"evaluations/{name}")
     task.get_logger().report_scalar("eval", "success", row["success"], iteration=row["n_demos"])
     task.flush()

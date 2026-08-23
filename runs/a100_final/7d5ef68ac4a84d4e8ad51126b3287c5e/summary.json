@@ -1,0 +1,80 @@
+{
+  "status": "completed",
+  "hardware": "one A100 80 GB",
+  "dataset_id": "b68a5e5b813e40ff94e5ec46fef0d8d0",
+  "seen_task": {
+    "id": "0ea56bb0a7a54c54b3b5169d7868f2f7",
+    "commit": "fd0172c",
+    "status": "failed after the completed LAPO representation phase, inside a diagnostic snapshot",
+    "active_seconds": 3240
+  },
+  "continuation_task": {
+    "id": "7d5ef68ac4a84d4e8ad51126b3287c5e",
+    "commit": "4321f62",
+    "status": "completed",
+    "active_seconds": 15757
+  },
+  "matrix": {
+    "tasks": [0, 1, 2],
+    "budgets": [5, 10, 25],
+    "training_seeds": [0, 1],
+    "eval_seed": 1000,
+    "episodes_per_cell": 20,
+    "eval_cells": 45,
+    "eval_episodes": 900,
+    "successful_episodes": 555
+  },
+  "mean_success": {
+    "zero_shot": {"0": 0.0},
+    "wrong_instruction": {"0": 0.0},
+    "mix_seen": {"5": 0.7416666667, "10": 0.8166666667, "25": 0.9166666667},
+    "lora_r32": {"5": 0.575, "10": 0.7166666667, "25": 0.8583333333},
+    "lapo_video_only": {"5": 0.0}
+  },
+  "task_mean_success": {
+    "mix_seen": {
+      "0": {"5": 0.9, "10": 0.725, "25": 0.95},
+      "1": {"5": 0.75, "10": 0.8, "25": 0.875},
+      "2": {"5": 0.575, "10": 0.925, "25": 0.925}
+    },
+    "lora_r32": {
+      "0": {"5": 0.325, "10": 0.475, "25": 0.85},
+      "1": {"5": 0.75, "10": 0.9, "25": 0.95},
+      "2": {"5": 0.65, "10": 0.775, "25": 0.775}
+    },
+    "lapo_video_only": {
+      "0": {"5": 0.0},
+      "1": {"5": 0.0},
+      "2": {"5": 0.0}
+    }
+  },
+  "training": {
+    "seen_pretrain": {
+      "episodes": 450,
+      "steps": 5000,
+      "batch_size": 32,
+      "loss_first": 3.2162022591,
+      "loss_last": 0.2965014875,
+      "training_seconds": 1405.244
+    },
+    "mix_seen": {
+      "batch_size": 32,
+      "steps_by_budget_and_task": {
+        "5": [206, 238, 247],
+        "10": [422, 488, 506],
+        "25": [1051, 1217, 1248]
+      }
+    },
+    "lora_r32": {"batch_size": 32, "steps": {"5": 100, "10": 200, "25": 500}},
+    "lapo": {"batch_size": 1, "representation_steps": 500, "policy_steps": 500, "target_action_steps": 100}
+  },
+  "local_artifacts": {
+    "clearml_artifacts": 145,
+    "files_after_archive_extraction": 399,
+    "eval_json": 45,
+    "training_metrics_jsonl": 42,
+    "rollout_videos": 120,
+    "seen_checkpoint": "seen_checkpoint"
+  },
+  "provenance_warning": "The downloaded per-run run.json files have incorrect repeated config fields because ClearML Task.connect mutated the supplied dictionary in place. Use this manifest, commit 4321f62, the metrics.jsonl row counts, and the 45 eval JSON files. The training and rollout outputs themselves are unaffected. Observer code was fixed after the run."
+}

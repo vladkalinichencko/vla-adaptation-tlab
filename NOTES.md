@@ -174,6 +174,7 @@
 | 16. Изоляция ошибки latent predictor | проверка target и ёмкости | [tokenwise](tmp/latent_failure_diagnosis.py), [pooled](tmp/latent_pooled_head_diagnosis.py) | завершена | [tokenwise](runs/latent_failure_diagnosis), [pooled](runs/latent_pooled_head_diagnosis/run.json) | одно окно: cosine 0.591; три окна с pooling: 0.469; pooling до predictor: 0.446 | текущая голова не запоминает даже один 50-step tokenwise target; pooling не устраняет проблему |
 | 17. Continuous LAPO tiny-set | новая реализация Bonus A | [policy](vla/modeling_latent_smolvla.py), [диагностика](tmp/lapo_tiny_overfit.py) | representation и wiring gates пройдены | [полный путь](runs/lapo_pipeline_tiny_overfit/run.json) | cosine 0.883; MSE true/zero/shuffled \(z\): 0.565/2.660/0.679; policy cosine 0.999996; action MAE true/predicted/zero: 0.367/0.369/0.563 | [representation dynamics](runs/lapo_pipeline_tiny_overfit/metrics.jsonl), [policy dynamics](runs/lapo_pipeline_tiny_overfit/policy_metrics.jsonl) |
 | 18. Continuous LAPO training boundary | общий training loop и checkpoint handoff | [boundary](tmp/lapo_training_boundary.py) | MPS representation не прошла | [run](runs/lapo_boundary_representation/run.json), [failure](runs/lapo_boundary_representation/failure.json) | `SIGABRT` до первой метрики с batch 2, затем с batch 1, workers 0 и vision encode batch 1 | tiny-run стабилен после удаления frozen VLM; полный backward держит VLM и token activations одновременно |
+| 19. A100 end-to-end boundary | обучение, checkpoint, rollout и загрузка артефактов | [runner](../vla-a100/benchmark_a100.py) | завершён | [локальные артефакты](runs/a100_calibration/0a02bed105e745e7b5fe18a6a3b65d7c) | 100 шагов за 30 с; loss 2.698 → 0.961; success 0/20 | action chunks, 10 видео и полный checkpoint |
 
 У всех вариантов training loss снизился, но каждый получил success 0/5. Всего получено 0 успехов в 55 предварительных rollout-эпизодах. Seen-претрен здесь длился только 100 шагов, поэтому этот отсев проверяет код и короткую динамику, но не оценивает полноценную адаптацию после обучения на `libero_90`.
 
@@ -188,11 +189,11 @@
 
 Continuous LAPO прошёл tiny-set representation и wiring gates. Следующий latent-запуск выполняется только на A100 по зафиксированной матрице.
 
-На A100 остаются обязательный наивный baseline, подмешивание seen, LoRA и прошедший gate Continuous LAPO Bonus A. Chunk 10, полное размораживание, удвоенная длительность и аугментации исключены владельцем. Наивный fine-tune не является кандидатом, но остаётся обязательной точкой отсчёта из Задачи 1.
+На A100 запускаются seen-претрен, zero-shot, wrong instruction, подмешивание seen, LoRA и прошедший gate Continuous LAPO Bonus A. Наивный fine-tune, chunk 10, полное размораживание, удвоенная длительность и аугментации исключены владельцем после предварительного отсева.
 
 ### Финальные прогоны
 
-Финальная матрица использует три target-задачи, бюджеты 5/10/25, training seeds 0 и 1 и 20 eval-эпизодов на каждую точку. Все методы стартуют из одного полного seen-checkpoint. Target-демо всегда берутся первыми по порядку.
+Финальная матрица использует три target-задачи, бюджеты 5/10/25, training seeds 0 и 1 и 20 eval-эпизодов на каждую точку. Все методы стартуют из одного seen-checkpoint. Target-демо всегда берутся первыми по порядку.
 
 #### Фиксированные настройки A100
 
@@ -200,29 +201,33 @@ Continuous LAPO прошёл tiny-set representation и wiring gates. Следу
 |---|---|
 | устройство | CUDA, BF16 |
 | batch и workers | 32, 8 |
+| LAPO batch и workers | 1, 4 |
 | action chunk | 50 предсказанных и 50 исполняемых действий |
 | flow matching | 10 шагов интеграции на каждом новом chunk |
-| seen-претрен | все 4500 эпизодов `libero_90`, 30 000 optimizer steps, seed 0 |
-| target fine-tune | 300 optimizer steps на демонстрацию: 1500, 3000 и 7500 шагов |
-| baseline и mix optimizer | AdamW, LR 1e-4, betas 0.9/0.95, eps 1e-8, weight decay 1e-10, gradient clip 10 |
-| baseline и mix scheduler | 100 warmup steps, cosine decay до 2.5e-6 |
+| seen-претрен | 450 равномерно выбранных эпизодов `libero_90`, 5000 optimizer steps, seed 0 |
+| target fine-tune | 100, 200 и 500 optimizer steps для 5, 10 и 25 демонстраций |
+| mix optimizer | AdamW, LR 1e-4, betas 0.9/0.95, eps 1e-8, weight decay 1e-10, gradient clip 10 |
+| mix scheduler | до 100 warmup steps, cosine decay до 2.5e-6 |
 | LoRA | r=32, alpha=32, LR 1e-3, 100 warmup steps, cosine decay до 1e-5 |
 | LoRA targets | q/v projections action expert, state projection, action input/output projections, две time projections |
 | mix | столько дополнительных optimizer steps, чтобы число target-примеров совпало с baseline |
 | оценка | `libero_goal` task IDs 0, 1, 2; init states из LIBERO; eval seed 1000; 20 эпизодов; максимум 300 env steps |
 
-Seen-претрен использует тот же AdamW с LR 1e-4, 1000 warmup steps и cosine decay до 2.5e-6. Zero-shot и wrong instruction ничего не обучают. Оба оценивают один seen-checkpoint. Wrong instruction меняет только текст задачи и проверяет, влияет ли язык на поведение.
+Seen-претрен использует AdamW с LR 1e-4, 100 warmup steps и cosine decay до 2.5e-6. Zero-shot и wrong instruction ничего не обучают. Оба оценивают один seen-checkpoint. Wrong instruction меняет только текст задачи и проверяет, влияет ли язык на поведение.
 
 | эксперимент | основание | код | статус | запуск | результат | диагностика |
 |---|---|---|---|---|---|---|
-| 1. Seen-претрен | Задача 1 | `run_final.py` | код не написан |  |  | loss и фиксированные action chunks |
-| 2. Zero-shot | точка 0 | `run_final.py` | код не написан |  |  | 3 задачи, rollout success и видео |
-| 3. Wrong instruction | контроль языка | `run_final.py` | код не написан |  |  | тот же checkpoint, init states и eval seeds |
-| 4. Наивный fine-tune cost curve | обязательный baseline | `run_final.py` | код не написан |  |  | 18 training cells, action chunks и видео |
-| 5. Подмешивание seen | кандидат Задачи 2 | `run_final.py` | код не написан |  |  | 18 cells и одинаковая target-экспозиция |
-| 6. LoRA r=32 | кандидат Задачи 2 | `run_final.py` | код не написан |  |  | 18 cells и фактические adapter targets |
-| 7. Continuous LAPO Bonus A | Задача 4 | [policy](vla/modeling_latent_smolvla.py), `run_final.py` | tiny-set gate пройден; финальный launcher не написан |  |  | representation, zero/shuffled latent, policy cosine, action controls и rollout success |
-| 8. Три характерных провала | Задача 3 | [rollouts](rollouts.py), [HTML](viz.py) | ждёт финальные rollout-ы |  |  | видео и различающий эксперимент для каждого фейла |
+| 1. Seen-претрен | Задача 1 | [A100 runner](../vla-a100/run_a100.py) | завершён | [метрики](runs/a100_final/7d5ef68ac4a84d4e8ad51126b3287c5e/metrics_final_seen_pretrain.jsonl), [ClearML](https://app.clearai.innopolis.university/projects/8446c91ffa3a418992b7dd6395145ac5/experiments/0ea56bb0a7a54c54b3b5169d7868f2f7/output/log) | loss 3.216 → 0.297 за 5000 шагов | checkpoint и полная loss-динамика |
+| 2. Zero-shot | точка 0 | [A100 runner](../vla-a100/run_a100.py) | завершён | [артефакты](runs/a100_final/7d5ef68ac4a84d4e8ad51126b3287c5e) | success 0/60 | 3 задачи, action chunks и 30 видео |
+| 3. Wrong instruction | контроль языка | [A100 runner](../vla-a100/run_a100.py) | завершён | те же артефакты | success 0/60 | тот же checkpoint, init states и eval seeds |
+| 4. Подмешивание seen | кандидат Задачи 2 | [A100 runner](../vla-a100/run_a100.py) | завершены 18 cells | [summary](runs/a100_final/7d5ef68ac4a84d4e8ad51126b3287c5e/summary.json) | mean success 0.742 / 0.817 / 0.917 при 5 / 10 / 25 демо | action chunks, 360 rollout-эпизодов и видео seed 0 |
+| 5. LoRA r=32 | кандидат Задачи 2 | [A100 runner](../vla-a100/run_a100.py) | завершены 18 cells | тот же summary | mean success 0.575 / 0.717 / 0.858 | action chunks, 360 rollout-эпизодов и видео seed 0 |
+| 6. Continuous LAPO Bonus A | Задача 4 | [policy](vla/modeling_latent_smolvla.py), [A100 runner](../vla-a100/run_a100.py) | завершён для 5 демо | тот же summary | success 0/60; representation loss 0.938 → 0.838; policy loss 10.262 → 0.188 | representation, zero/shuffled latent, policy cosine и action controls |
+| 7. Три характерных провала | Задача 3 | [rollouts](rollouts.py), [HTML](viz.py) | ждёт финальные rollout-ы |  |  | видео и различающий эксперимент для каждого фейла |
+
+Финальный запуск разделён на два последовательных task на одной A100 80 GB. Первый task сохранил seen-checkpoint и затем упал в BF16-диагностике после завершённого LAPO representation train. Второй task загрузил тот же checkpoint, прошёл исправленную диагностику и закончил всю матрицу. Они заняли 3240 и 15757 секунд, суммарно 5 ч 17 мин.
+
+В скачанных `run.json` неверно повторяются некоторые LAPO config-поля: `ClearML Task.connect()` менял переданный словарь на месте. Метрики, checkpoints и rollout-результаты не затронуты. Проверенный [manifest](runs/a100_final/7d5ef68ac4a84d4e8ad51126b3287c5e/summary.json) опирается на commit, имена ячеек, фактическое число строк metrics и 45 eval JSON. Observer после запуска исправлен.
 
 ### Что показывают старые proxy-прогоны
 
