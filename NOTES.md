@@ -166,7 +166,13 @@
 | 13. Latent transition и decoder с seen actions | `OWNER_NOTES.md` | [policy](vla/modeling_latent_smolvla.py), [очередь](run_preliminary.py) | завершён | [transition](runs/preliminary_latent_transition/metrics.jsonl), [decoder](runs/preliminary_latent_seen_decoder/metrics.jsonl), [eval](eval_logs/preliminary_latent_seen_actions_t0_n5_s0/eval_info.json) | transition loss 1.989 → 1.167; success 0/5 | [latent](runs/diagnostics/preliminary_latent_transition_transitions.json), [actions](runs/diagnostics/preliminary_latent_seen_actions_t0_n5_s0_actions.json) |
 | 14. Latent transition без seen actions | Bonus A | [policy](vla/modeling_latent_smolvla.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_latent_video_only_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_latent_video_only_t0_n5_s0/eval_info.json) | loss 0.289 → 0.273; success 0/5 | [action controls](runs/diagnostics/preliminary_latent_video_only_t0_n5_s0_actions.json) |
 
-У всех вариантов training loss снизился, но каждый получил success 0/5. Этот отсев подтверждает работоспособность кода и диагностик, но не выбирает метод для финального запуска.
+У всех вариантов training loss снизился, но каждый получил success 0/5. Всего получено 0 успехов в 55 предварительных rollout-эпизодах. Seen-претрен здесь длился только 100 шагов, поэтому этот отсев проверяет код и короткую динамику, но не оценивает полноценную адаптацию после обучения на `libero_90`.
+
+- На трёх фиксированных кадрах из target-демонстраций action MAE равен 0.136 у fine-tune на 200 шагов, 0.179 у полного размораживания и 0.196 у наивного fine-tune на 100 шагов. Это измеряет запоминание обучающих демонстраций, а не rollout-обобщение.
+- LoRA, chunk 10, аугментации и подмешивание seen не улучшили action MAE относительно наивного fine-tune в этом коротком прогоне: 0.208, 0.187, 0.199 и 0.210 соответственно.
+- У latent transition средний cosine с настоящим visual-token transition равен 0.0003. Перестановка 50 предсказанных transition-шагов меняет decoded actions в среднем на 0.000003. Текущая latent-ветка не показывает, что выучила направление перехода или порядок будущих шагов; увеличивать её бюджет без отдельного разбора нельзя.
+
+Следующий вычислительный этап требует решения владельца. Минимальный A100 gate: полноценный seen-претрен, затем один seed наивного fine-tune и его контроля длительности на официальных данных. Подмешивание seen остаётся отдельным кандидатом из-за старого proxy-результата 0.80, но текущий MPS-прогон его не подтвердил. Остальные обычные варианты пока не дают основания запускать их все на полном бюджете.
 
 ### Финальные прогоны
 

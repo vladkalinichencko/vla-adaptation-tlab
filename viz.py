@@ -1,4 +1,4 @@
-"""Build the self-contained VLA experiment observer in runs/report.html."""
+"""Build the self-contained VLA Mac screening observer."""
 
 import json
 import math
@@ -8,29 +8,32 @@ from collections import defaultdict
 
 
 LABELS = {
-    "default": "Naive fine-tune, old proxy",
-    "fixed": "Corrected fine-tune, old proxy",
     "seen_pretrain": "Seen pretrain",
     "zero_shot": "Zero-shot",
     "wrong_instruction": "Wrong instruction",
     "naive_finetune": "Naive fine-tune",
-    "longer_finetune": "Fine-tune, twice as long",
+    "longer_finetune": "Longer fine-tune",
     "full_finetune": "Full fine-tune",
-    "mix_seen": "Target mixed with seen",
+    "mix_seen": "Mix seen",
     "lora_r32": "LoRA r=32",
-    "chunk_10": "Action chunk 10",
+    "chunk_10": "Chunk 10",
     "image_augmentations": "Image augmentations",
     "latent_transition": "Latent transition pretrain",
-    "latent_seen_decoder": "Decoder trained on seen actions",
-    "latent_seen_actions": "Latent transition with seen actions",
-    "latent_video_only": "Latent transition without seen actions",
+    "latent_seen_decoder": "Latent decoder on seen actions",
+    "latent_seen_actions": "Latent with seen actions",
+    "latent_video_only": "Latent without seen actions",
+    "default": "Naive fine-tune",
+    "fixed": "Corrected fine-tune",
 }
 
 
-def readable(name):
+def run_id(name):
     name = re.sub(r"^preliminary_", "", name)
-    name = re.sub(r"_t\d+(?:_n\d+)?(?:_s\d+)?$", "", name)
-    return LABELS.get(name, name.replace("_", " ").title())
+    return re.sub(r"_t\d+(?:_n\d+)?(?:_s\d+)?$", "", name)
+
+
+def label(name):
+    return LABELS.get(run_id(name), run_id(name).replace("_", " ").title())
 
 
 def read_jsonl(path):
@@ -41,18 +44,14 @@ def finite(value):
     return value if not isinstance(value, float) or math.isfinite(value) else None
 
 
-def proxy_curves(rows):
-    grouped = defaultdict(list)
-    for row in rows:
-        if "eval" not in row:
-            grouped[(row["method"], row["n_demos"])].append(row["success"])
-    curves = defaultdict(list)
-    for (method, demos), values in grouped.items():
-        curves[method].append({"demos": demos, "success": sum(values) / len(values)})
-    return [
-        {"name": readable(method), "points": sorted(points, key=lambda x: x["demos"])}
-        for method, points in curves.items() if len(points) > 1
+def mean_difference(samples, left, right):
+    values = [
+        abs(a - b)
+        for sample in samples
+        for left_step, right_step in zip(sample[left], sample[right])
+        for a, b in zip(left_step, right_step)
     ]
+    return sum(values) / len(values)
 
 
 def load_data():
@@ -60,76 +59,136 @@ def load_data():
     rows = read_jsonl(runs / "results.jsonl")
     training = []
     for path in sorted(runs.glob("preliminary_*/metrics.jsonl")):
-        values = read_jsonl(path)
-        kept = [row for i, row in enumerate(values) if i == 0 or i == len(values) - 1 or (i + 1) % 10 == 0]
-        training.append({"name": readable(path.parent.name), "rows": [
-            {key: finite(value) for key, value in row.items()} for row in kept
-        ]})
+        raw = read_jsonl(path)
+        kept = [row for index, row in enumerate(raw)
+                if index == 0 or index == len(raw) - 1 or (index + 1) % 10 == 0]
+        start = raw[0]["loss"]
+        training.append({
+            "id": run_id(path.parent.name),
+            "name": label(path.parent.name),
+            "rows": [{"step": row["step"], "loss": finite(row["loss"]),
+                      "relative_loss": finite(row["loss"] / start)} for row in kept],
+        })
 
-    diagnostics = runs / "diagnostics"
-    actions = [{
-        "name": readable(path.stem.removesuffix("_actions")),
-        "samples": json.loads(path.read_text()),
-    } for path in sorted(diagnostics.glob("preliminary_*_actions.json"))]
+    actions = []
+    for path in sorted((runs / "diagnostics").glob("preliminary_*_actions.json")):
+        samples = json.loads(path.read_text())
+        identifier = run_id(path.stem.removesuffix("_actions"))
+        actions.append({
+            "id": identifier,
+            "name": label(identifier),
+            "samples": samples,
+            "mae": mean_difference(samples, "target", "predicted"),
+        })
+
+    reference = next(action for action in actions if action["id"] == "naive_finetune")
+    for action in actions:
+        if action["id"] == "seen_pretrain":
+            continue
+        for sample, expected in zip(action["samples"], reference["samples"]):
+            if (sample["episode"], sample["frame"]) != (expected["episode"], expected["frame"]):
+                raise ValueError(f"Action snapshot is not comparable: {action['name']}")
+            if sample["target"] != expected["target"][:len(sample["target"])]:
+                raise ValueError(f"Action target differs: {action['name']}")
+
     transitions = []
-    for path in sorted(diagnostics.glob("preliminary_*_transitions.json")):
+    for path in sorted((runs / "diagnostics").glob("preliminary_*_transitions.json")):
         row = json.loads(path.read_text())
-        row["name"] = readable(path.stem.removesuffix("_transitions"))
+        row.update(id=run_id(path.stem.removesuffix("_transitions")),
+                   name=label(path.stem.removesuffix("_transitions")))
         transitions.append(row)
-    cells = [{**row, "phase": "Preliminary" if "eval" in row else "Old proxy",
-              "label": readable(row["method"])} for row in rows]
-    return {"curves": proxy_curves(rows), "training": training, "actions": actions,
-            "transitions": transitions, "cells": cells}
+
+    controls = []
+    for action in actions:
+        samples = action["samples"]
+        if samples and "zero_latent_actions" in samples[0]:
+            controls.append({
+                "id": action["id"],
+                "name": action["name"],
+                "values": [
+                    {"name": "zero latent", "value": mean_difference(samples, "predicted", "zero_latent_actions")},
+                    {"name": "reversed step order", "value": mean_difference(samples, "predicted", "reversed_latent_actions")},
+                    {"name": "observed transition", "value": mean_difference(samples, "predicted", "true_latent_actions")},
+                ],
+            })
+
+    proxy = defaultdict(list)
+    for row in rows:
+        if "eval" not in row:
+            proxy[(row["method"], row["n_demos"])].append(row["success"])
+    proxy_points = defaultdict(list)
+    for (method, demos), values in proxy.items():
+        proxy_points[method].append({"demos": demos, "success": sum(values) / len(values)})
+
+    preliminary = [row for row in rows if "eval" in row]
+    return {
+        "training": training,
+        "actions": actions,
+        "transitions": transitions,
+        "controls": controls,
+        "proxy": [{"id": method, "name": label(method),
+                   "points": sorted(points, key=lambda point: point["demos"])}
+                  for method, points in proxy_points.items()],
+        "rollouts": {
+            "episodes": sum(row["n_episodes"] for row in preliminary),
+            "successes": sum(round(row["success"] * row["n_episodes"]) for row in preliminary),
+            "methods": len(preliminary),
+        },
+    }
 
 
-TEMPLATE = r'''<!doctype html><html lang="en"><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VLA experiment observer</title>
-<style>
-:root{--ink:#18202b;--muted:#667085;--line:#dfe4eb;--blue:#2563eb;--orange:#d97706;--teal:#0f766e;--violet:#7c3aed}
-*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-main{max-width:1120px;margin:auto;padding:34px 24px 64px}h1{font-size:25px;letter-spacing:-.025em;margin:0 0 3px}h2{font-size:17px;letter-spacing:-.01em;margin:0 0 4px}p{margin:0}.intro,.note,.meta{color:var(--muted)}.intro{font-size:15px;margin-bottom:28px}
-.grid{display:grid;grid-template-columns:1fr 1fr;column-gap:42px}.panel{padding:28px 0;margin:0;border-top:1px solid var(--line)}.wide{grid-column:1/-1}
-.controls{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0 10px}select,input{border:0;border-bottom:1px solid #aeb7c3;border-radius:0;background:#fff;color:var(--ink);padding:6px 2px;font:inherit}select:focus,input:focus{outline:0;border-color:var(--ink)}input{min-width:240px}
-.chart{width:100%;height:auto;display:block}.axis{stroke:#cfd6df}.gridline{stroke:#e9edf2}.tick{fill:var(--muted);font-size:11px}.label{font-size:12px;font-weight:650}.hit{fill:transparent;cursor:crosshair}.swatch{display:inline-block;width:24px;border-top:3px solid;margin:0 6px 3px 14px}.swatch:first-child{margin-left:0}.dash{border-top-style:dashed}
-.tooltip{position:fixed;display:none;pointer-events:none;background:#111827;color:#fff;border-radius:4px;padding:7px 9px;font-size:12px;line-height:1.4;z-index:9;max-width:300px}
-.heat{display:grid;gap:2px;margin-top:12px;overflow:auto}.heat-row{display:grid;grid-template-columns:72px repeat(50,minmax(9px,1fr));gap:2px;min-width:760px;align-items:center}.heat-cell{height:23px;border-radius:2px}.heat-name{color:var(--muted);font-size:11px}
-details summary{cursor:pointer;font-weight:650}table{border-collapse:collapse;width:100%;font-size:12px}.table-wrap{max-height:420px;overflow:auto;margin-top:10px}th,td{padding:7px 9px;border-bottom:1px solid #edf0f4;text-align:left;white-space:nowrap}th{position:sticky;top:0;background:#f8fafc;z-index:1}td.num{text-align:right;font-variant-numeric:tabular-nums}
-@media(max-width:760px){.grid{grid-template-columns:1fr}.panel{padding:24px 0}main{padding:24px 16px}.wide{grid-column:auto}}
-</style><main>
-<h1>VLA experiment observer</h1><p class="intro">Training behavior, predicted action chunks, and measured adaptation results.</p>
-<section class="panel"><h2>Cost curve</h2><p class="note">Only old proxy methods measured at multiple demonstration budgets are connected. Preliminary one-budget runs stay out of this comparison.</p><div id="cost"></div></section>
-<div class="grid"><section class="panel"><h2>Training dynamics</h2><p class="note">Logged every ten optimizer steps; hover for the exact value.</p><div class="controls"><select id="train-run"></select><select id="train-metric"></select></div><div id="training"></div></section>
-<section class="panel"><h2>Action chunks</h2><p class="note">Target and policy prediction for one of the seven action coordinates across the full chunk.</p><div class="controls"><select id="action-run"></select><select id="action-sample"></select><select id="action-dim"></select></div><p class="meta" id="action-meta"></p><div id="actions"></div></section>
-<section class="panel wide"><h2>Latent transition</h2><p class="note">Cosine similarity between predicted and observed visual-latent change, by chunk step and camera.</p><div id="latent"></div></section></div>
-<section class="panel"><details><summary>All measured cells (<span id="cell-count"></span>)</summary><div class="controls"><select id="phase"><option>Preliminary</option><option>Old proxy</option><option>All</option></select><input id="search" placeholder="Filter method or task"></div><div class="table-wrap"><table><thead><tr><th>Phase</th><th>Method</th><th>Task</th><th>Demos</th><th>Episodes</th><th>Success</th></tr></thead><tbody id="cells"></tbody></table></div></details></section>
+TEMPLATE = r'''<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VLA Mac screening</title><style>
+:root{--fg:#15202b;--mut:#5f6b76;--line:#d6dce2;--blue:#1d4ed8;--orange:#c2410c;--grey:#a9b1b9;--paper:#f7f8fa}
+*{box-sizing:border-box}body{font:14px/1.42 system-ui;margin:0;color:var(--fg);background:#fff}
+header{position:sticky;top:0;z-index:3;background:#fffffff2;backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:10px max(16px,calc((100vw - 1460px)/2));display:grid;grid-template-columns:auto 1fr auto;gap:10px 18px;align-items:center}
+h1{font-size:16px;margin:0;white-space:nowrap}.readout{display:flex;justify-content:flex-end;gap:18px;font-variant-numeric:tabular-nums}.readout span{white-space:nowrap}.readout b{display:block;font-size:16px}
+main{max-width:1460px;margin:auto;padding:18px 16px 42px;display:grid;grid-template-columns:1fr 1fr;gap:24px 28px}.wide{grid-column:1/-1}section{border-top:1px solid var(--line);padding-top:12px;min-width:0}
+h2{font-size:15px;margin:0 0 4px}.explain,.caption{color:var(--mut);margin:0 0 10px;max-width:105ch}.caption{margin-top:7px}.plots{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px 18px}.metric-title{font-weight:600;margin-bottom:3px}
+svg{display:block;width:100%;height:auto;background:var(--paper)}.axis{stroke:#9ca6af;stroke-width:1}.grid{stroke:#e5e8eb;stroke-width:1}.line{fill:none;stroke-width:2;opacity:.9}.target{fill:none;stroke:#111827;stroke-width:2.5}.dim{stroke:var(--grey);opacity:.17;stroke-width:1}.selected{stroke:var(--blue);opacity:1;stroke-width:3}.naive{stroke:var(--orange);stroke-dasharray:6 4;opacity:1}
+.legend,.sample-controls{display:flex;flex-wrap:wrap;gap:5px}.legend{grid-column:1/-1}.legend button,.sample-controls button{font:inherit;border:1px solid var(--line);background:#fff;color:var(--mut);padding:4px 8px;border-radius:5px;cursor:pointer}.legend button.active,.sample-controls button.active{border-color:var(--blue);color:var(--blue);background:#eef4ff}.swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}.sample-controls{margin:8px 0 12px}
+.tooltip{position:fixed;display:none;pointer-events:none;background:#111827;color:#fff;padding:6px 8px;border-radius:4px;font-size:12px;z-index:5}.provenance{color:var(--mut);margin-top:10px}.provenance a{color:var(--blue)}
+@media(max-width:1000px){header{grid-template-columns:1fr}.readout{justify-content:flex-start}main{grid-template-columns:1fr}.wide{grid-column:auto}}@media(max-width:620px){.readout{display:grid;grid-template-columns:1fr 1fr}}
+</style><header><h1>VLA Mac screening</h1><div class="readout" id="readout"></div><div class="legend" id="method-filter"></div></header><main>
+<section class="wide"><h2>Old proxy results</h2><p class="explain">Every measured method is visible. Lines exist only when the same method was evaluated at several demonstration budgets. These runs used the old proxy dataset.</p><svg id="proxy" viewBox="0 0 1180 390"></svg></section>
+<section class="wide"><h2>Training dynamics</h2><p class="explain">Every run starts at 1.0. The shared logarithmic scale shows relative optimization progress despite different loss definitions. Episode-mask and padding-mask losses are omitted because they are identical in every recorded step.</p><svg id="training" viewBox="0 0 1180 390"></svg></section>
+<section class="wide"><h2>Action error on fixed target-demo frames</h2><p class="explain">Mean absolute error over three frames, every chunk step, and seven action coordinates. Lower means the checkpoint fits these demonstration frames better; this is not held-out rollout quality.</p><svg id="action-error" viewBox="0 0 1180 500"></svg></section>
+<section class="wide"><h2>Predicted action chunks</h2><p class="explain">Seven action coordinates are shown together on the same [-1, 1] scale. Black is the demonstrated target. Chunk 10 ends after step 9 by design.</p><div class="sample-controls" id="sample-controls"></div><div class="plots" id="action-plots"></div></section>
+<section><h2>Latent transition alignment</h2><p class="explain">Latent SmolVLA uses the frozen visual encoder, a transition predictor, and a linear action decoder. Cosine similarity compares predicted and observed visual-token change for both cameras.</p><svg id="cosine" viewBox="0 0 700 430"></svg></section>
+<section><h2>Does the latent affect actions?</h2><p class="explain">Mean action change after replacing the predicted latent. Near zero for reversed step order means the decoder receives almost the same sequence after reversal.</p><svg id="controls" viewBox="0 0 700 430"></svg></section>
+<section class="wide"><details class="provenance"><summary>Raw artifacts</summary><p><a href="results.jsonl">results.jsonl</a> contains rollout cells. Training metrics and action snapshots remain in their run directories.</p></details></section>
 </main><div class="tooltip" id="tip"></div><script>
-const DATA=__DATA__, NS="http://www.w3.org/2000/svg", tip=document.querySelector("#tip");
-const $=s=>document.querySelector(s), E=(tag,a={})=>{const n=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(a))n.setAttribute(k,v);return n};
-const fmt=v=>v==null?"—":Number(v).toLocaleString(undefined,{maximumFractionDigits:4});
-const METRICS={loss:"Total loss",grad_norm:"Gradient norm",lr:"Learning rate",next_lr:"Next learning rate",seconds:"Seconds per step",samples_per_second:"Samples per second",losses_after_forward:"Action loss",losses_after_in_ep_bound:"Loss after episode mask",losses_after_rm_padding:"Loss after padding mask"};
-function hover(node,html){node.onmousemove=e=>{tip.innerHTML=html();tip.style.display="block";tip.style.left=Math.min(e.clientX+12,innerWidth-310)+"px";tip.style.top=(e.clientY+12)+"px"};node.onmouseleave=()=>tip.style.display="none"}
-function lineChart(target,series,{yMin=null,yMax=null,xName="Step"}={}){const W=850,H=310,L=55,R=116,T=18,B=38,all=series.flatMap(s=>s.points),xs=all.map(p=>p.x),ys=all.map(p=>p.y).filter(Number.isFinite);target.replaceChildren();if(!all.length||!ys.length){target.textContent="No data";return}const x0=Math.min(...xs),x1=Math.max(...xs),lo=yMin??Math.min(...ys),hi=yMax??Math.max(...ys),span=Math.max(hi-lo,1e-9),X=x=>L+(x-x0)/Math.max(x1-x0,1)*(W-L-R),Y=y=>H-B-(y-lo)/span*(H-T-B),svg=E("svg",{viewBox:`0 0 ${W} ${H}`,class:"chart"});
-for(let i=0;i<=4;i++){const y=T+i*(H-T-B)/4,v=hi-i*span/4;svg.append(E("line",{x1:L,y1:y,x2:W-R,y2:y,class:"gridline"}));const t=E("text",{x:4,y:y+4,class:"tick"});t.textContent=fmt(v);svg.append(t)}
-svg.append(E("line",{x1:L,y1:H-B,x2:W-R,y2:H-B,class:"axis"}));const ticks=[...new Set(xs)].sort((a,b)=>a-b),stride=Math.max(1,Math.ceil(ticks.length/8));ticks.filter((_,i)=>i===0||i===ticks.length-1||i%stride===0).forEach(x=>{const t=E("text",{x:X(x),y:H-12,class:"tick","text-anchor":"middle"});t.textContent=x;svg.append(t)});
-series.forEach((s,si)=>{const path=E("path",{d:s.points.map((p,i)=>`${i?"L":"M"}${X(p.x)} ${Y(p.y)}`).join(" "),fill:"none",stroke:s.color,"stroke-width":2.5,"stroke-dasharray":s.dash?"8 5":""});svg.append(path);s.points.forEach(p=>{const c=E(si&&s.square?"rect":"circle",si&&s.square?{x:X(p.x)-4,y:Y(p.y)-4,width:8,height:8,fill:s.color}:{cx:X(p.x),cy:Y(p.y),r:4,fill:s.color});hover(c,()=>`<b>${s.name}</b><br>${xName}: ${p.x}<br>Value: ${fmt(p.y)}${p.detail||""}`);svg.append(c)});if(s.direct){const t=E("text",{x:W-8,y:Y(s.points.at(-1).y)+(si?16:-8),class:"label",fill:s.color,"text-anchor":"end"});t.textContent=s.name;svg.append(t)}});target.append(svg)}
-lineChart($("#cost"),DATA.curves.map((s,i)=>({...s,color:i?"#d97706":"#2563eb",dash:i>0,square:i>0,direct:true,points:s.points.map(p=>({x:p.demos,y:p.success}))})),{yMin:0,yMax:1,xName:"Demos"});
-const trainRun=$("#train-run"),trainMetric=$("#train-metric");DATA.training.forEach((r,i)=>trainRun.add(new Option(r.name,i)));
-function training(){const run=DATA.training[+trainRun.value],keys=Object.keys(run?.rows[0]||{}).filter(k=>k!=="step"&&run.rows.some(r=>Number.isFinite(r[k]))),old=trainMetric.value;trainMetric.replaceChildren(...keys.map(k=>new Option(METRICS[k]||k,k)));if(keys.includes(old))trainMetric.value=old;const key=trainMetric.value;lineChart($("#training"),[{name:METRICS[key]||key,color:"#7c3aed",points:run.rows.filter(r=>Number.isFinite(r[key])).map(r=>({x:r.step,y:r[key]}))}])}trainRun.onchange=training;trainMetric.onchange=training;training();
-const actionRun=$("#action-run"),actionSample=$("#action-sample"),actionDim=$("#action-dim");DATA.actions.forEach((r,i)=>actionRun.add(new Option(r.name,i)));for(let i=0;i<7;i++)actionDim.add(new Option(`Action ${i}`,i));
-function actionSamples(){const samples=DATA.actions[+actionRun.value]?.samples||[];actionSample.replaceChildren(...samples.map((s,i)=>new Option(`Episode ${s.episode}, frame ${s.frame}`,i)));actions()}
-function actions(){const s=DATA.actions[+actionRun.value]?.samples[+actionSample.value];if(!s)return;const d=+actionDim.value,target=s.target.map((a,i)=>({x:i,y:a[d]})),pred=s.predicted.map((a,i)=>({x:i,y:a[d]})),mae=target.reduce((v,p,i)=>v+Math.abs(p.y-pred[i].y),0)/target.length;target.forEach((p,i)=>p.detail=`<br>Prediction: ${fmt(pred[i].y)}<br>Absolute error: ${fmt(Math.abs(p.y-pred[i].y))}`);pred.forEach((p,i)=>p.detail=`<br>Target: ${fmt(target[i].y)}<br>Absolute error: ${fmt(Math.abs(p.y-target[i].y))}`);$("#action-meta").textContent=`${s.instruction} · mean absolute error ${fmt(mae)}`;lineChart($("#actions"),[{name:"Target",color:"#2563eb",points:target},{name:"Prediction",color:"#d97706",dash:true,square:true,points:pred}])}actionRun.onchange=actionSamples;actionSample.onchange=actions;actionDim.onchange=actions;actionSamples();
-function latent(){const root=$("#latent"),d=DATA.transitions[0];if(!d){root.textContent="No latent-transition diagnostics";return}const flat=d.cosine_by_step_and_view.flat(),mean=flat.reduce((a,b)=>a+b,0)/flat.length;root.innerHTML=`<p class="meta">${d.name} · episode ${d.episode}, frame ${d.frame} · mean cosine ${fmt(mean)}</p>`;const heat=document.createElement("div");heat.className="heat";for(let v=0;v<d.cosine_by_step_and_view[0].length;v++){const row=document.createElement("div");row.className="heat-row";const name=document.createElement("span");name.className="heat-name";name.textContent=`Camera ${v+1}`;row.append(name);d.cosine_by_step_and_view.forEach((step,i)=>{const value=step[v],cell=document.createElement("span");cell.className="heat-cell";cell.style.background=`hsl(${12+Math.max(0,Math.min(1,(value+1)/2))*198} 68% 48%)`;hover(cell,()=>`<b>Camera ${v+1}, step ${i}</b><br>Cosine: ${fmt(value)}<br>Target norm: ${fmt(d.target_norm_by_step_and_view[i][v])}<br>Prediction norm: ${fmt(d.predicted_norm_by_step_and_view[i][v])}`);row.append(cell)});heat.append(row)}root.append(heat)}latent();
-function cells(){const phase=$("#phase").value,q=$("#search").value.toLowerCase(),rows=DATA.cells.filter(r=>(phase==="All"||r.phase===phase)&&`${r.label} ${r.task}`.toLowerCase().includes(q));$("#cell-count").textContent=rows.length;$("#cells").replaceChildren(...rows.map(r=>{const tr=document.createElement("tr");[r.phase,r.label,r.task,r.n_demos,r.n_episodes,fmt(r.success)].forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;if(i>2)td.className="num";tr.append(td)});return tr}))}$("#phase").onchange=cells;$("#search").oninput=cells;cells();
-</script></html>'''
+const DATA=__DATA__,S="http://www.w3.org/2000/svg",BLUE="#1d4ed8",ORANGE="#c2410c",GREY="#a9b1b9",tip=document.querySelector("#tip");
+const node=(tag,a={},text="")=>{const n=document.createElementNS(S,tag);for(const[k,v]of Object.entries(a))n.setAttribute(k,v);if(text!=="")n.textContent=text;return n};
+const palette=["#2563eb","#d97706","#0f766e","#7c3aed","#be123c","#0369a1","#4d7c0f","#a21caf","#92400e","#475569","#0891b2","#c026d3","#4338ca"];
+const allMethods=[...new Map(DATA.training.concat(DATA.actions).map(x=>[x.id,{id:x.id,name:x.name}])).values()],methods=DATA.actions.filter(x=>x.id!=="seen_pretrain").map(x=>({id:x.id,name:x.name})),colors=Object.fromEntries(allMethods.map((m,i)=>[m.id,palette[i%palette.length]]));
+let selected=null,sampleIndex=0;
+function showTip(event,html){tip.innerHTML=html;tip.style.display="block";tip.style.left=Math.min(event.clientX+12,innerWidth-270)+"px";tip.style.top=event.clientY+12+"px"}function hideTip(){tip.style.display="none"}
+function style(id){if(!selected)return{stroke:colors[id]||GREY,cls:"line"};if(id===selected)return{stroke:BLUE,cls:"line selected"};if(id==="naive_finetune")return{stroke:ORANGE,cls:"line naive"};return{stroke:GREY,cls:"line dim"}}
+function plotFrame(svg,{x=[0,1],y=[0,1],xTicks,yTicks,xLabel,yLabel,logY=false}){svg.replaceChildren();const W=+svg.viewBox.baseVal.width,H=+svg.viewBox.baseVal.height,p={l:58,r:18,t:18,b:46},tx=v=>p.l+(v-x[0])/(x[1]-x[0])*(W-p.l-p.r),transform=v=>logY?Math.log10(v):v,yy=y.map(transform),ty=v=>H-p.b-(transform(v)-yy[0])/(yy[1]-yy[0])*(H-p.t-p.b);for(const v of yTicks){const py=ty(v);svg.append(node("line",{x1:p.l,y1:py,x2:W-p.r,y2:py,class:"grid"}),node("text",{x:p.l-8,y:py+4,"text-anchor":"end",fill:"#5f6b76","font-size":11},String(v)))}for(const v of xTicks){const px=tx(v);svg.append(node("text",{x:px,y:H-14,"text-anchor":"middle",fill:"#5f6b76","font-size":11},String(v)))}svg.append(node("line",{x1:p.l,y1:p.t,x2:p.l,y2:H-p.b,class:"axis"}),node("line",{x1:p.l,y1:H-p.b,x2:W-p.r,y2:H-p.b,class:"axis"}));svg.append(node("text",{x:W-p.r,y:H-3,"text-anchor":"end",fill:"#5f6b76","font-size":12},xLabel),node("text",{x:p.l+5,y:p.t+13,fill:"#5f6b76","font-size":12},yLabel));return{X:tx,Y:ty,W,H,p}}
+function path(svg,rows,X,Y,id,xKey,yKey,name){const s=style(id),p=node("path",{d:rows.map((r,i)=>(i?"L":"M")+X(r[xKey])+","+Y(r[yKey])).join(" "),class:s.cls,stroke:s.stroke});p.style.cursor="pointer";p.onmouseenter=e=>showTip(e,`<b>${name}</b>`);p.onmousemove=e=>showTip(e,`<b>${name}</b>`);p.onmouseleave=hideTip;p.onclick=()=>select(id);svg.append(p)}
+function point(svg,x,y,color,html,r=4){const c=node("circle",{cx:x,cy:y,r,fill:color});c.onmousemove=e=>showTip(e,html);c.onmouseleave=hideTip;svg.append(c);return c}
+function select(id){selected=selected===id?null:id;render()}
+function renderLegend(){const root=document.querySelector("#method-filter");root.replaceChildren();for(const m of methods){const b=document.createElement("button"),s=document.createElement("i");s.className="swatch";s.style.background=selected?(m.id===selected?BLUE:m.id==="naive_finetune"?ORANGE:GREY):colors[m.id];b.append(s,m.name);b.className=m.id===selected?"active":"";b.onclick=()=>select(m.id);root.append(b)}}
+function renderProxy(){const svg=document.querySelector("#proxy"),{X,Y}=plotFrame(svg,{x:[0,25],y:[0,1],xTicks:[0,5,10,15,20,25],yTicks:[0,.25,.5,.75,1],xLabel:"demonstrations",yLabel:"rollout success"});DATA.proxy.forEach((m,i)=>{const color=palette[i%palette.length];if(m.points.length>1)svg.append(node("path",{d:m.points.map((p,j)=>(j?"L":"M")+X(p.demos)+","+Y(p.success)).join(" "),class:"line",stroke:color}));m.points.forEach(p=>point(svg,X(p.demos),Y(p.success),color,`<b>${m.name}</b><br>${p.demos} demos<br>success ${p.success.toFixed(2)}`))})}
+function renderTraining(){const svg=document.querySelector("#training"),{X,Y}=plotFrame(svg,{x:[0,210],y:[.1,4],xTicks:[0,50,100,150,200],yTicks:[.1,.25,.5,1,2,4],xLabel:"optimizer step",yLabel:"loss / step-1 loss",logY:true});svg.append(node("line",{x1:X(0),y1:Y(1),x2:X(210),y2:Y(1),stroke:"#6b7280","stroke-dasharray":"3 4"}));for(const run of DATA.training)path(svg,run.rows,X,Y,run.id,"step","relative_loss",run.name)}
+function targetActions(){return DATA.actions.find(x=>x.id==="naive_finetune")||DATA.actions.find(x=>x.id!=="seen_pretrain")}
+function comparableActions(){return DATA.actions.filter(x=>x.id!=="seen_pretrain")}
+function renderActionError(){const rows=comparableActions().slice().sort((a,b)=>a.mae-b.mae),svg=document.querySelector("#action-error"),W=1180,H=500,p={l:220,r:55,t:18,b:38},max=.35,X=v=>p.l+v/max*(W-p.l-p.r),gap=(H-p.t-p.b)/rows.length;svg.replaceChildren();for(let i=0;i<=7;i++){const v=i*.05,x=X(v);svg.append(node("line",{x1:x,y1:p.t,x2:x,y2:H-p.b,class:"grid"}),node("text",{x,y:H-14,"text-anchor":"middle",fill:"#5f6b76","font-size":11},v.toFixed(2)))}rows.forEach((r,i)=>{const y=p.t+gap*(i+.5),s=style(r.id);svg.append(node("text",{x:p.l-12,y:y+4,"text-anchor":"end",fill:s.stroke,"font-size":12},r.name),node("line",{x1:p.l,y1:y,x2:X(r.mae),y2:y,stroke:"#cfd5dc"}));const c=point(svg,X(r.mae),y,s.stroke,`<b>${r.name}</b><br>training-demo action MAE ${r.mae.toFixed(4)}`,5);c.onclick=()=>select(r.id)});svg.append(node("text",{x:W-p.r,y:H-3,"text-anchor":"end",fill:"#5f6b76","font-size":12},"mean absolute error →"))}
+function renderSampleControls(){const root=document.querySelector("#sample-controls"),samples=targetActions().samples;root.replaceChildren();samples.forEach((s,i)=>{const b=document.createElement("button");b.textContent=`frame ${s.frame}`;b.className=i===sampleIndex?"active":"";b.onclick=()=>{sampleIndex=i;renderActions();renderSampleControls()};root.append(b)})}
+function renderActions(){const root=document.querySelector("#action-plots"),base=targetActions().samples[sampleIndex],runs=comparableActions();root.replaceChildren();for(let dim=0;dim<7;dim++){const box=document.createElement("div"),title=document.createElement("div"),svg=node("svg",{viewBox:"0 0 340 205"});title.className="metric-title";title.textContent=`action[${dim}]`;box.append(title,svg);const {X,Y}=plotFrame(svg,{x:[0,49],y:[-1.05,1.05],xTicks:[0,10,20,30,40,49],yTicks:[-1,0,1],xLabel:"chunk step",yLabel:"value"}),target=base.target.map((a,i)=>({step:i,value:a[dim]}));svg.append(node("path",{d:target.map((r,i)=>(i?"L":"M")+X(r.step)+","+Y(r.value)).join(" "),class:"target"}));for(const run of runs){const sample=run.samples[sampleIndex],rows=sample.predicted.map((a,i)=>({step:i,value:a[dim]}));path(svg,rows,X,Y,run.id,"step","value",run.name);rows.forEach(r=>{const hit=node("circle",{cx:X(r.step),cy:Y(r.value),r:4,fill:"transparent"});hit.onmousemove=e=>showTip(e,`<b>${run.name}</b><br>action[${dim}], step ${r.step}<br>prediction ${r.value.toFixed(4)}<br>target ${target[r.step]?.value.toFixed(4)??"not recorded"}`);hit.onmouseleave=hideTip;svg.append(hit)})}root.append(box)}}
+function renderCosine(){const svg=document.querySelector("#cosine"),d=DATA.transitions[0];if(!d)return;const {X,Y}=plotFrame(svg,{x:[0,49],y:[-1,1],xTicks:[0,10,20,30,40,49],yTicks:[-1,-.5,0,.5,1],xLabel:"chunk step",yLabel:"cosine"});for(let camera=0;camera<2;camera++){const rows=d.cosine_by_step_and_view.map((v,i)=>({step:i,value:v[camera]})),color=camera?ORANGE:BLUE;svg.append(node("path",{d:rows.map((r,i)=>(i?"L":"M")+X(r.step)+","+Y(r.value)).join(" "),class:"line",stroke:color,"stroke-dasharray":camera?"6 4":""}));rows.forEach(r=>point(svg,X(r.step),Y(r.value),color,`<b>${d.name}, camera ${camera+1}</b><br>step ${r.step}<br>cosine ${r.value.toFixed(5)}`,2.5))}}
+function renderControls(){const svg=document.querySelector("#controls"),rows=DATA.controls.flatMap(run=>run.values.map(v=>({...v,id:run.id,method:run.name}))),W=700,H=430,p={l:210,r:55,t:18,b:38},max=.06,X=v=>p.l+v/max*(W-p.l-p.r),gap=(H-p.t-p.b)/rows.length;svg.replaceChildren();for(let i=0;i<=3;i++){const v=i*.02,x=X(v);svg.append(node("line",{x1:x,y1:p.t,x2:x,y2:H-p.b,class:"grid"}),node("text",{x,y:H-14,"text-anchor":"middle",fill:"#5f6b76","font-size":11},v.toFixed(2)))}rows.forEach((r,i)=>{const y=p.t+gap*(i+.5),s=style(r.id),text=`${r.method}: ${r.name}`;svg.append(node("text",{x:p.l-10,y:y+4,"text-anchor":"end",fill:s.stroke,"font-size":11},text),node("line",{x1:p.l,y1:y,x2:X(r.value),y2:y,stroke:"#cfd5dc"}));point(svg,X(r.value),y,s.stroke,`<b>${text}</b><br>mean action change ${r.value.toFixed(6)}`,4)});svg.append(node("text",{x:W-p.r,y:H-3,"text-anchor":"end",fill:"#5f6b76","font-size":12},"mean action change →"))}
+function render(){renderLegend();renderTraining();renderActionError();renderActions();renderCosine();renderControls()}const r=DATA.rollouts;document.querySelector("#readout").innerHTML=`<span>target rollout success<b>${r.successes}/${r.episodes}</b></span><span>evaluated variants<b>${r.methods}</b></span><span>training runs<b>${DATA.training.length}</b></span>`;renderProxy();renderSampleControls();render();
+</script>'''
 
 
 def main():
     data = load_data()
     output = pathlib.Path("runs/report.html")
     output.write_text(TEMPLATE.replace("__DATA__", json.dumps(data, ensure_ascii=False, allow_nan=False)))
-    print(f"{len(data['curves'])} curves, {len(data['training'])} training runs, "
-          f"{len(data['actions'])} action diagnostics, {len(data['cells'])} cells -> {output}")
+    print(f"{len(data['training'])} training runs, {len(data['actions'])} action snapshots, "
+          f"{len(data['proxy'])} proxy methods -> {output}")
 
 
 if __name__ == "__main__":
