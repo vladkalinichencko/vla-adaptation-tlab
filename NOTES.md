@@ -170,6 +170,7 @@
 | 12. Аугментации изображений | Задача 2 | [метод](vla/methods.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_image_augmentations_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_image_augmentations_t0_n5_s0/eval_info.json) | loss 1.713 → 0.693; success 0/5 | [action chunks](runs/diagnostics/preliminary_image_augmentations_t0_n5_s0_actions.json), [кадры](runs/diagnostics/augmentations/metadata.json) |
 | 13. Latent transition и decoder с seen actions | `OWNER_NOTES.md` | [policy](vla/modeling_latent_smolvla.py), [очередь](run_preliminary.py) | завершён | [transition](runs/preliminary_latent_transition/metrics.jsonl), [decoder](runs/preliminary_latent_seen_decoder/metrics.jsonl), [eval](eval_logs/preliminary_latent_seen_actions_t0_n5_s0/eval_info.json) | transition loss 1.989 → 1.167; success 0/5 | [latent](runs/diagnostics/preliminary_latent_transition_transitions.json), [actions](runs/diagnostics/preliminary_latent_seen_actions_t0_n5_s0_actions.json) |
 | 14. Latent transition без seen actions | Bonus A | [policy](vla/modeling_latent_smolvla.py), [очередь](run_preliminary.py) | завершён | [метрики](runs/preliminary_latent_video_only_t0_n5_s0/metrics.jsonl), [eval](eval_logs/preliminary_latent_video_only_t0_n5_s0/eval_info.json) | loss 0.289 → 0.273; success 0/5 | [action controls](runs/diagnostics/preliminary_latent_video_only_t0_n5_s0_actions.json) |
+| 15. Tiny-set overfit latent | capacity и wiring gate перед A100 | [диагностика](tmp/latent_tiny_overfit.py) | заблокирован на MPS | метрик нет | Metal завершает процесс `SIGABRT` внутри `Linear`; метод не оценён | transition cosine, action MAE для true, predicted, zero и reversed latent |
 
 У всех вариантов training loss снизился, но каждый получил success 0/5. Всего получено 0 успехов в 55 предварительных rollout-эпизодах. Seen-претрен здесь длился только 100 шагов, поэтому этот отсев проверяет код и короткую динамику, но не оценивает полноценную адаптацию после обучения на `libero_90`.
 
@@ -177,19 +178,43 @@
 - LoRA, chunk 10, аугментации и подмешивание seen не улучшили action MAE относительно наивного fine-tune в этом коротком прогоне: 0.208, 0.187, 0.199 и 0.210 соответственно.
 - У latent transition средний cosine с настоящим visual-token transition равен 0.0003. Перестановка 50 предсказанных transition-шагов меняет decoded actions в среднем на 0.000003. Текущая latent-ветка не показывает, что выучила направление перехода или порядок будущих шагов; увеличивать её бюджет без отдельного разбора нельзя.
 
-Следующий вычислительный этап требует решения владельца. Минимальный A100 gate: полноценный seen-претрен, затем один seed наивного fine-tune и его контроля длительности на официальных данных. Подмешивание seen остаётся отдельным кандидатом из-за старого proxy-результата 0.80, но текущий MPS-прогон его не подтвердил. Остальные обычные варианты пока не дают основания запускать их все на полном бюджете.
+Перед A100 запускаем tiny-set overfit latent-ветки. Если predictor не запоминает три фиксированных перехода и decoder не начинает зависеть от latent, большой latent-прогон не запускается.
+
+На A100 остаются обязательный наивный baseline, подмешивание seen и LoRA. Chunk 10, полное размораживание, удвоенная длительность и аугментации исключены владельцем. Наивный fine-tune не является кандидатом, но остаётся обязательной точкой отсчёта из Задачи 1. Latent Bonus A добавляется только после успешного tiny-set overfit.
 
 ### Финальные прогоны
 
-Финальная матрица использует три target-задачи, бюджеты 5/10/25, минимум два training seeds и минимум 20 eval-эпизодов. Методы выбираются после предварительной динамики; до этого `run_final.py` не фиксируется.
+Финальная матрица использует три target-задачи, бюджеты 5/10/25, training seeds 0 и 1 и 20 eval-эпизодов на каждую точку. Все методы стартуют из одного полного seen-checkpoint. Target-демо всегда берутся первыми по порядку.
+
+#### Фиксированные настройки A100
+
+| поле | значение |
+|---|---|
+| устройство | CUDA, BF16 |
+| batch и workers | 32, 8 |
+| action chunk | 50 предсказанных и 50 исполняемых действий |
+| flow matching | 10 шагов интеграции на каждом новом chunk |
+| seen-претрен | все 4500 эпизодов `libero_90`, 30 000 optimizer steps, seed 0 |
+| target fine-tune | 300 optimizer steps на демонстрацию: 1500, 3000 и 7500 шагов |
+| baseline и mix optimizer | AdamW, LR 1e-4, betas 0.9/0.95, eps 1e-8, weight decay 1e-10, gradient clip 10 |
+| baseline и mix scheduler | 100 warmup steps, cosine decay до 2.5e-6 |
+| LoRA | r=32, alpha=32, LR 1e-3, 100 warmup steps, cosine decay до 1e-5 |
+| LoRA targets | q/v projections action expert, state projection, action input/output projections, две time projections |
+| mix | столько дополнительных optimizer steps, чтобы число target-примеров совпало с baseline |
+| оценка | `libero_goal` task IDs 0, 1, 2; init states из LIBERO; eval seed 1000; 20 эпизодов; максимум 300 env steps |
+
+Seen-претрен использует тот же AdamW с LR 1e-4, 1000 warmup steps и cosine decay до 2.5e-6. Zero-shot и wrong instruction ничего не обучают. Оба оценивают один seen-checkpoint. Wrong instruction меняет только текст задачи и проверяет, влияет ли язык на поведение.
 
 | эксперимент | основание | код | статус | запуск | результат | диагностика |
 |---|---|---|---|---|---|---|
-| 1. Seen-претрен и zero-shot | Задача 1 |  | не запущен |  |  | loss, три zero-shot rollout-набора, language control |
-| 2. Наивный fine-tune cost curve | baseline |  | не запущен |  |  | все cells, action chunks, видео |
-| 3. Выбранный метод адаптации | Задача 2 |  | метод не выбран |  |  | все cells и сравнение с baseline |
-| 4. Latent Bonus A | Задача 4 |  | решение после предварительного прогона |  |  | (z), causal controls, cost curve |
-| 5. Три характерных провала | Задача 3 | [rollouts](rollouts.py), [HTML](viz.py) | ждёт финальные rollout-ы |  |  | видео и различающий эксперимент для каждого фейла |
+| 1. Seen-претрен | Задача 1 | `run_final.py` | код не написан |  |  | loss и фиксированные action chunks |
+| 2. Zero-shot | точка 0 | `run_final.py` | код не написан |  |  | 3 задачи, rollout success и видео |
+| 3. Wrong instruction | контроль языка | `run_final.py` | код не написан |  |  | тот же checkpoint, init states и eval seeds |
+| 4. Наивный fine-tune cost curve | обязательный baseline | `run_final.py` | код не написан |  |  | 18 training cells, action chunks и видео |
+| 5. Подмешивание seen | кандидат Задачи 2 | `run_final.py` | код не написан |  |  | 18 cells и одинаковая target-экспозиция |
+| 6. LoRA r=32 | кандидат Задачи 2 | `run_final.py` | код не написан |  |  | 18 cells и фактические adapter targets |
+| 7. Latent Bonus A | Задача 4 | `run_final.py` | ждёт tiny-set overfit |  |  | cost curve, cosine, zero и reversed latent controls |
+| 8. Три характерных провала | Задача 3 | [rollouts](rollouts.py), [HTML](viz.py) | ждёт финальные rollout-ы |  |  | видео и различающий эксперимент для каждого фейла |
 
 ### Что показывают старые proxy-прогоны
 
@@ -213,6 +238,7 @@ LoRA действительно обучалась с эффективным LR 
 - Контроль языка сравнивает action chunks при одной observation и двух инструкциях. Rollout success проверяет, влияет ли разница на поведение в среде.
 - Гипотеза забывания проверяется на одних и тех же seen и target кадрах до и после target fine-tune. Сравниваются action chunks и роллауты.
 - Для метода представлений на одних фиксированных парах показываются настоящий \(z_t\), предсказанный \(\hat z_t\), action из настоящего \(z_t\) и action из \(\hat z_t\). Обнуление и перестановка \(z\) проверяют, использует ли decoder этот код. Проекции добавляются только после просмотра самих тензоров.
+- Перестановка 50 latent-шагов не требовалась заданием и не заменяет rollout success. Это наш causal control для выбранной архитектуры: если перестановка будущих переходов не меняет соответствующие actions, весь latent-путь не использует временной порядок chunk.
 - HTML строится только из JSON реальных запусков. Отсутствующие значения показываются как `not recorded`.
 
 ## Согласованный метод латентного изменения кадров
