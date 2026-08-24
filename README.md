@@ -1,7 +1,7 @@
 # Адаптация SmolVLA к новым задачам LIBERO
 
 Тестовое задание T-LAB, направление World, Action & Reward Models. Условие — в
-[NOTES.md](NOTES.md), отчёт — в [report.md](report.md).
+NOTES.md, отчёт — в [report.md](report.md).
 
 ## Результаты
 
@@ -30,7 +30,6 @@ python -m vla.training      # обучение выбранного метода
 python -m vla.evaluation    # роллауты и строка в runs/results.jsonl
 python cost_curve.py        # кривая success против числа демонстраций
 python viz.py               # -> report_page.html
-python make_figures.py      # рисунок отчёта
 ```
 
 ## Раскладка кода

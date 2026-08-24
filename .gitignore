@@ -60,3 +60,7 @@ setup_gpu.sh
 setup_macos_libero.sh
 setup.sh
 run_preliminary.py
+
+# журнал работы и вспомогательные скрипты: проверяющему не нужны
+NOTES.md
+tmp/
