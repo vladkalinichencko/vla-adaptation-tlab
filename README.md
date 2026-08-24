@@ -29,7 +29,7 @@ pip install -r requirements.txt
 python -m vla.training      # обучение выбранного метода адаптации
 python -m vla.evaluation    # роллауты и строка в runs/results.jsonl
 python cost_curve.py        # кривая success против числа демонстраций
-python viz.py               # -> runs/report.html
+python viz.py               # -> report_page.html
 python make_figures.py      # рисунок отчёта
 ```
 
@@ -46,4 +46,4 @@ python make_figures.py      # рисунок отчёта
 | `rollouts.py`, `cost_curve.py`, `viz.py` | сбор роллаутов, кривая и страница |
 
 Интерактивная диагностика с реальными кадрами и роллаут-видео:
-[runs/report.html](runs/report.html).
+[report_page.html](report_page.html).

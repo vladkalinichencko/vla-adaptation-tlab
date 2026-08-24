@@ -167,7 +167,7 @@ const s=D.summary;document.querySelector("#readout").innerHTML=`<span>A100 eval 
 
 
 def main() -> None:
-    output = RUNS / "report.html"
+    output = Path("report_page.html")
     output.write_text(TEMPLATE.replace("__DATA__", json.dumps(load_data(), ensure_ascii=False)))
     print(output)
 
