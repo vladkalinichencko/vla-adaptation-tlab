@@ -1,12 +1,0 @@
-objc[30260]: Class AVFFrameReceiver is implemented in both /Users/vladislavkalinichenko/VSCodeProjects/T-Lab Contests/world-action-reward-models/.venv/lib/python3.12/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x13cd303a8) and /Users/vladislavkalinichenko/VSCodeProjects/T-Lab Contests/world-action-reward-models/.venv/lib/python3.12/site-packages/cv2/.dylibs/libavdevice.61.3.100.dylib (0x154c843a8). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
-objc[30260]: Class AVFAudioReceiver is implemented in both /Users/vladislavkalinichenko/VSCodeProjects/T-Lab Contests/world-action-reward-models/.venv/lib/python3.12/site-packages/av/.dylibs/libavdevice.61.3.100.dylib (0x13cd303f8) and /Users/vladislavkalinichenko/VSCodeProjects/T-Lab Contests/world-action-reward-models/.venv/lib/python3.12/site-packages/cv2/.dylibs/libavdevice.61.3.100.dylib (0x154c843f8). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
-WARNING:lerobot.configs.policies:Device 'cuda' is not available. Switching to 'mps'.
-`torch_dtype` is deprecated! Use `dtype` instead!
-Loading  HuggingFaceTB/SmolVLM2-500M-Video-Instruct weights ...
-Loading weights:   0%|          | 0/489 [00:00<?, ?it/s]Loading weights: 100%|██████████| 489/489 [00:00<00:00, 5493.09it/s]
-WARNING:root:Missing key(s) when loading model: {'transition_head.predictor.0.bias', 'transition_head.predictor.0.weight', 'transition_head.predictor.3.bias', 'transition_head.view_embedding', 'transition_head.predictor.1.weight', 'action_decoder.weight', 'transition_head.predictor.3.weight', 'transition_head.step_embedding', 'transition_head.predictor.1.bias', 'action_decoder.bias'}
-<stdin>:16: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
-Consider using tensor.detach() first. (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:837.)
-Reducing the number of VLM layers to 16 ...
-mps 0.7956634163856506 {'transition_loss': 0.7956634163856506, 'transition_cosine': -0.00016116957704070956, 'target_delta_norm': 20.2047119140625, 'predicted_delta_norm': 6.123836040496826}
-grad 0.09989947825670242

@@ -54,3 +54,9 @@ runs/**/tokenizer/
 
 # автоматизация и wiring-проверки: проверяющим не нужны
 tmp/
+
+# вспомогательные setup-скрипты под конкретные машины
+setup_gpu.sh
+setup_macos_libero.sh
+setup.sh
+run_preliminary.py

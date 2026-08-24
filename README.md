@@ -1,47 +1,49 @@
-# SmolVLA на LIBERO: адаптация малым бюджетом демо
+# Адаптация SmolVLA к новым задачам LIBERO
 
-Тестовое задание T-LAB, World/Action/Reward Models. Условие — [NOTES.md](NOTES.md),
-конвенции репозитория — [AGENTS.md](AGENTS.md).
+Тестовое задание T-LAB, направление World, Action & Reward Models. Условие — в
+[NOTES.md](NOTES.md), отчёт — в [report.md](report.md).
 
-## Setup
+## Результаты
 
-macOS (симулятор работает, но медленно — 20 шагов/с):
+| метод | 5 демо | 10 демо | 25 демо |
+|---|---:|---:|---:|
+| подмешивание seen | 0.742 | 0.817 | 0.917 |
+| LoRA r=32 | 0.575 | 0.717 | 0.858 |
+| zero-shot | 0/60 | — | — |
+| чужая инструкция | 0/60 | — | — |
+| Bonus A, латентные действия | 0/60 | — | — |
+
+Среднее по трём задачам `libero_goal` и двум training seeds, по 20 роллаутов на точку.
+Seen-претрен: 5000 шагов на 450 эпизодах `libero_90`, loss 3.216 → 0.297.
+
+## Установка
 
 ```bash
-./setup.sh
-./setup_macos_libero.sh      # LIBERO в обход hf-egl-probe
-export MUJOCO_GL=cgl
-```
-
-Linux + GPU (полные прогоны):
-
-```bash
-./setup_gpu.sh
-export MUJOCO_GL=egl
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ## Запуск
 
 ```bash
-python run_preliminary.py
-python viz.py
+python -m vla.training      # обучение выбранного метода адаптации
+python -m vla.evaluation    # роллауты и строка в runs/results.jsonl
+python cost_curve.py        # кривая success против числа демонстраций
+python viz.py               # -> runs/report.html
+python make_figures.py      # рисунок отчёта
 ```
 
-`run_preliminary.py` последовательно запускает короткий MPS-отсев. Методы собраны в
-`vla/methods.py`, явный optimizer loop находится в `vla/training.py`. Параметры
-написаны в Python, CLI-флагов обучения нет.
+## Раскладка кода
 
-Каждый шаг пишется в `runs/<run>/metrics.jsonl`, конфигурация и статус в
-`runs/<run>/run.json`. Оценки лежат в `runs/results.jsonl`, action chunks и latent
-transitions в `runs/diagnostics/`. На CUDA те же значения дополнительно уходят в
-ClearML. W&B и MLflow не используются.
+| путь | что там |
+|---|---|
+| `vla/data.py` | фиксированный split, первые демонстрации по порядку |
+| `vla/training.py` | один training path на все методы адаптации |
+| `vla/methods.py` | подмешивание seen, LoRA и наивный fine-tune |
+| `vla/evaluation.py` | роллауты, success и запись в `runs/results.jsonl` |
+| `vla/behavior.py`, `vla/diagnostics.py` | action chunks, контроль на язык, разбор фейлов |
+| `vla/modeling_latent_smolvla.py` | латентные действия для Bonus A |
+| `rollouts.py`, `cost_curve.py`, `viz.py` | сбор роллаутов, кривая и страница |
 
-Финальный CUDA-runner находится в отдельной code-only ветке `vla-a100` и запускается без флагов:
-
-```bash
-cd ../vla-a100
-./setup_gpu.sh
-python run_a100.py
-```
-
-Он последовательно выполняет seen-претрен, zero-shot, wrong instruction, Continuous LAPO, seen-mix и LoRA. Итоговая матрица и ссылки на сырые артефакты записаны в [NOTES.md](NOTES.md), сводка лежит в `runs/a100_final/*/summary.json`, визуализация собирается командой `python viz.py`.
+Интерактивная диагностика с реальными кадрами и роллаут-видео:
+[runs/report.html](runs/report.html).
