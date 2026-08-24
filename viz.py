@@ -54,7 +54,7 @@ def rollout(root: Path, name: str, wanted_success: bool | None = None) -> dict:
 
 
 def load_data() -> dict:
-    summary_path = sorted((RUNS / "a100_final").glob("*/summary.json"))[-1]
+    summary_path = sorted((RUNS / "final").glob("summary.json"))[-1]
     root = summary_path.parent
     summary = json.loads(summary_path.read_text())
 

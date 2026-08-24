@@ -156,24 +156,24 @@
 
 | эксперимент | основание | код | статус | запуск | результат | диагностика |
 |---|---|---|---|---|---|---|
-| 1. Конверсия `libero_90` и `libero_goal` | данные из условия | [конвертер](tmp/convert_libero.py) | завершена | [seen](logs/libero_90_conversion.json), [target](logs/libero_goal_conversion.json) | 4500 seen и 500 target эпизодов; три target-задачи прочитаны | кадры и pixel diff |
-| 2. Явный цикл SmolVLA | проверка инфраструктуры | [цикл](vla/training.py), [test](tmp/smoke_training_boundary.py) | один шаг прошёл; checkpoint повторно загружен | метрики, run | loss 3.682; LR шага 1e-4 | loss, gradient norm, LR, action-loss components |
-| 3. Seen-претрен | Задача 1 | [очередь](run_preliminary.py) | завершён | метрики, run | loss 3.831 → 1.237 | action chunks |
-| 4. Zero-shot | Задача 1 | [очередь](run_preliminary.py) | завершён | [eval](eval_logs/preliminary_zero_shot_t0/eval_info.json) | success 0/5 | action chunks, видео в eval |
-| 5. Контроль с чужой инструкцией | Задача 1 | [очередь](run_preliminary.py) | завершён | [eval](eval_logs/preliminary_wrong_instruction_t0/eval_info.json) | success 0/5 | action chunks, видео в eval |
-| 6. Наивный fine-tune | baseline | [очередь](run_preliminary.py) | завершён | метрики, [eval](eval_logs/preliminary_naive_finetune_t0_n5_s0/eval_info.json) | loss 1.707 → 0.685; success 0/5 | action chunks |
-| 7. Удвоенная длительность | контроль для mix | [очередь](run_preliminary.py) | завершён | метрики, [eval](eval_logs/preliminary_longer_finetune_t0_n5_s0/eval_info.json) | loss 1.707 → 0.404; success 0/5 | action chunks |
-| 8. Полное размораживание | Задача 2 | [метод](vla/methods.py), [test](tmp/full_finetune_boundary.py) | завершён | метрики, [eval](eval_logs/preliminary_full_finetune_t0_n5_s0/eval_info.json) | loss 1.707 → 0.749; success 0/5 | action chunks |
-| 9. Подмешивание seen | Задача 2, `OWNER_NOTES.md` | [data](vla/data.py), [очередь](run_preliminary.py) | завершён, target не прореживался | метрики, [eval](eval_logs/preliminary_mix_seen_t0_n5_s0/eval_info.json) | loss 1.352 → 0.806; success 0/5 | action chunks |
-| 10. LoRA r=32, LR 1e-3 | Задача 2 | [метод](vla/methods.py), [test](tmp/lora_training_boundary.py) | завершён | метрики, [eval](eval_logs/preliminary_lora_r32_t0_n5_s0/eval_info.json) | loss 1.707 → 0.711; success 0/5 | action chunks |
-| 11. Action chunk 10 | Задача 2 | [метод](vla/methods.py), [очередь](run_preliminary.py) | завершён | метрики, [eval](eval_logs/preliminary_chunk_10_t0_n5_s0/eval_info.json) | loss 2.009 → 1.075; success 0/5 | action chunks |
-| 12. Аугментации изображений | Задача 2 | [метод](vla/methods.py), [очередь](run_preliminary.py) | завершён | метрики, [eval](eval_logs/preliminary_image_augmentations_t0_n5_s0/eval_info.json) | loss 1.713 → 0.693; success 0/5 | action chunks, кадры |
-| 13. Raw visual-residual с seen actions | первая версия из `OWNER_NOTES.md` | запуск, реализация заменена | завершён, метод отклонён | decoder, [eval](eval_logs/preliminary_latent_seen_actions_t0_n5_s0/eval_info.json) | transition loss 1.989 → 1.167; success 0/5 | latent, actions |
-| 14. Raw visual-residual без seen actions | первая версия Bonus A | исторический запуск | завершён, метод отклонён | [eval](eval_logs/preliminary_latent_video_only_t0_n5_s0/eval_info.json) | loss 0.289 → 0.273; success 0/5 | action controls |
-| 15. Tiny-set raw visual-residual | capacity и wiring gate | [диагностика](tmp/latent_tiny_overfit.py) | gate не пройден | run, динамика | cosine -0.0001 → 0.274; predicted-latent action MAE 0.126 хуже zero 0.110 | true, predicted, zero и reversed latent |
-| 16. Изоляция ошибки latent predictor | проверка target и ёмкости | [tokenwise](tmp/latent_failure_diagnosis.py), [pooled](tmp/latent_pooled_head_diagnosis.py) | завершена | tokenwise, pooled | одно окно: cosine 0.591; три окна с pooling: 0.469; pooling до predictor: 0.446 | текущая голова не запоминает даже один 50-step tokenwise target; pooling не устраняет проблему |
-| 17. Continuous LAPO tiny-set | новая реализация Bonus A | [policy](vla/modeling_latent_smolvla.py), [диагностика](tmp/lapo_tiny_overfit.py) | representation и wiring gates пройдены | полный путь | cosine 0.883; MSE true/zero/shuffled \(z\): 0.565/2.660/0.679; policy cosine 0.999996; action MAE true/predicted/zero: 0.367/0.369/0.563 | representation dynamics, policy dynamics |
-| 18. Continuous LAPO training boundary | общий training loop и checkpoint handoff | [boundary](tmp/lapo_training_boundary.py) | MPS representation не прошла | run, failure | `SIGABRT` до первой метрики с batch 2, затем с batch 1, workers 0 и vision encode batch 1 | tiny-run стабилен после удаления frozen VLM; полный backward держит VLM и token activations одновременно |
+| 1. Конверсия `libero_90` и `libero_goal` | данные из условия | конвертер | завершена | seen, target | 4500 seen и 500 target эпизодов; три target-задачи прочитаны | кадры и pixel diff |
+| 2. Явный цикл SmolVLA | проверка инфраструктуры | [цикл](vla/training.py), test | один шаг прошёл; checkpoint повторно загружен | метрики, run | loss 3.682; LR шага 1e-4 | loss, gradient norm, LR, action-loss components |
+| 3. Seen-претрен | Задача 1 | очередь | завершён | метрики, run | loss 3.831 → 1.237 | action chunks |
+| 4. Zero-shot | Задача 1 | очередь | завершён | eval | success 0/5 | action chunks, видео в eval |
+| 5. Контроль с чужой инструкцией | Задача 1 | очередь | завершён | eval | success 0/5 | action chunks, видео в eval |
+| 6. Наивный fine-tune | baseline | очередь | завершён | метрики, eval | loss 1.707 → 0.685; success 0/5 | action chunks |
+| 7. Удвоенная длительность | контроль для mix | очередь | завершён | метрики, eval | loss 1.707 → 0.404; success 0/5 | action chunks |
+| 8. Полное размораживание | Задача 2 | [метод](vla/methods.py), test | завершён | метрики, eval | loss 1.707 → 0.749; success 0/5 | action chunks |
+| 9. Подмешивание seen | Задача 2, `OWNER_NOTES.md` | [data](vla/data.py), очередь | завершён, target не прореживался | метрики, eval | loss 1.352 → 0.806; success 0/5 | action chunks |
+| 10. LoRA r=32, LR 1e-3 | Задача 2 | [метод](vla/methods.py), test | завершён | метрики, eval | loss 1.707 → 0.711; success 0/5 | action chunks |
+| 11. Action chunk 10 | Задача 2 | [метод](vla/methods.py), очередь | завершён | метрики, eval | loss 2.009 → 1.075; success 0/5 | action chunks |
+| 12. Аугментации изображений | Задача 2 | [метод](vla/methods.py), очередь | завершён | метрики, eval | loss 1.713 → 0.693; success 0/5 | action chunks, кадры |
+| 13. Raw visual-residual с seen actions | первая версия из `OWNER_NOTES.md` | запуск, реализация заменена | завершён, метод отклонён | decoder, eval | transition loss 1.989 → 1.167; success 0/5 | latent, actions |
+| 14. Raw visual-residual без seen actions | первая версия Bonus A | исторический запуск | завершён, метод отклонён | eval | loss 0.289 → 0.273; success 0/5 | action controls |
+| 15. Tiny-set raw visual-residual | capacity и wiring gate | диагностика | gate не пройден | run, динамика | cosine -0.0001 → 0.274; predicted-latent action MAE 0.126 хуже zero 0.110 | true, predicted, zero и reversed latent |
+| 16. Изоляция ошибки latent predictor | проверка target и ёмкости | tokenwise, pooled | завершена | tokenwise, pooled | одно окно: cosine 0.591; три окна с pooling: 0.469; pooling до predictor: 0.446 | текущая голова не запоминает даже один 50-step tokenwise target; pooling не устраняет проблему |
+| 17. Continuous LAPO tiny-set | новая реализация Bonus A | [policy](vla/modeling_latent_smolvla.py), диагностика | representation и wiring gates пройдены | полный путь | cosine 0.883; MSE true/zero/shuffled \(z\): 0.565/2.660/0.679; policy cosine 0.999996; action MAE true/predicted/zero: 0.367/0.369/0.563 | representation dynamics, policy dynamics |
+| 18. Continuous LAPO training boundary | общий training loop и checkpoint handoff | boundary | MPS representation не прошла | run, failure | `SIGABRT` до первой метрики с batch 2, затем с batch 1, workers 0 и vision encode batch 1 | tiny-run стабилен после удаления frozen VLM; полный backward держит VLM и token activations одновременно |
 | 19. A100 end-to-end boundary | обучение, checkpoint, rollout и загрузка артефактов | [runner](../vla-a100/benchmark_a100.py) | завершён | локальные артефакты | 100 шагов за 30 с; loss 2.698 → 0.961; success 0/20 | action chunks, 10 видео и полный checkpoint |
 
 У всех вариантов training loss снизился, но каждый получил success 0/5. Всего получено 0 успехов в 55 предварительных rollout-эпизодах. Seen-претрен здесь длился только 100 шагов, поэтому этот отсев проверяет код и короткую динамику, но не оценивает полноценную адаптацию после обучения на `libero_90`.
@@ -183,7 +183,7 @@
 - У отклонённого raw-residual predictor средний cosine с настоящим visual-token transition равен 0.0003. Перестановка 50 предсказанных transition-шагов меняет decoded actions в среднем на 0.000003.
 - Tiny-set test отделил decoder от predictor. Линейный decoder запомнил actions из настоящего latent до MAE 0.006 и реагирует на перестановку шагов. Predictor не запомнил три фиксированных окна: cosine остановился на 0.274, а predicted-latent MAE 0.126 хуже zero-latent MAE 0.110. Большой latent-прогон не запускается до нового согласованного predictor.
 - Изоляция predictor показала, что проблема не сводится к spatial token loss. Текущая голова не запомнила один tokenwise window за 1000 шагов, cosine 0.591. Усреднение 64 visual tokens до loss или до predictor дало cosine 0.469 и 0.446 на трёх окнах.
-- Transition loss не использовал image padding mask. При равномерной выборке кадров 17.15% 50-step transition targets в `libero_90` выходили за конец эпизода и становились нулевыми из-за повторения последнего кадра. [Loss](vla/modeling_latent_smolvla.py) теперь исключает переход, если один из двух кадров padded; [boundary test](tmp/latent_padding_boundary.py) пройден.
+- Transition loss не использовал image padding mask. При равномерной выборке кадров 17.15% 50-step transition targets в `libero_90` выходили за конец эпизода и становились нулевыми из-за повторения последнего кадра. [Loss](vla/modeling_latent_smolvla.py) теперь исключает переход, если один из двух кадров padded; boundary test пройден.
 - Новая схема повторяет нужный механизм [LAPO](https://arxiv.org/abs/2312.10812), но использует непрерывный \(z\in\mathbb{R}^{32}\) вместо VQ. Inverse model получает соседние frozen visual tokens, forward model восстанавливает их разность, latent policy предсказывает 50 \(z\) из первого кадра и инструкции, linear decoder выдаёт 50 actions.
 - На трёх фиксированных окнах LAPO representation снизила MSE с 3.666 до 0.565. Zero \(z\) дал 2.660, shuffled \(z\) 0.679, поэтому forward model использует bottleneck. Latent policy запомнила targets с cosine 0.999996. Action MAE с предсказанным \(z\) 0.369 почти совпал с настоящим \(z\) 0.367 и лучше нулевого \(z\) 0.563.
 
@@ -217,17 +217,17 @@ Seen-претрен использует AdamW с LR 1e-4, 100 warmup steps и c
 
 | эксперимент | основание | код | статус | запуск | результат | диагностика |
 |---|---|---|---|---|---|---|
-| 1. Seen-претрен | Задача 1 | [A100 runner](../vla-a100/run_a100.py) | завершён | [метрики](runs/a100_final/7d5ef68ac4a84d4e8ad51126b3287c5e/metrics_final_seen_pretrain.jsonl), [ClearML](https://app.clearai.innopolis.university/projects/8446c91ffa3a418992b7dd6395145ac5/experiments/0ea56bb0a7a54c54b3b5169d7868f2f7/output/log) | loss 3.216 → 0.297 за 5000 шагов | checkpoint и полная loss-динамика |
-| 2. Zero-shot | точка 0 | [A100 runner](../vla-a100/run_a100.py) | завершён | [артефакты](runs/a100_final/7d5ef68ac4a84d4e8ad51126b3287c5e) | success 0/60 | 3 задачи, action chunks и 30 видео |
+| 1. Seen-претрен | Задача 1 | [A100 runner](../vla-a100/run_a100.py) | завершён | [метрики](runs/final/metrics_final_seen_pretrain.jsonl), [ClearML](https://app.clearai.innopolis.university/projects/8446c91ffa3a418992b7dd6395145ac5/experiments/0ea56bb0a7a54c54b3b5169d7868f2f7/output/log) | loss 3.216 → 0.297 за 5000 шагов | checkpoint и полная loss-динамика |
+| 2. Zero-shot | точка 0 | [A100 runner](../vla-a100/run_a100.py) | завершён | [артефакты](runs/final) | success 0/60 | 3 задачи, action chunks и 30 видео |
 | 3. Wrong instruction | контроль языка | [A100 runner](../vla-a100/run_a100.py) | завершён | те же артефакты | success 0/60 | тот же checkpoint, init states и eval seeds |
-| 4. Подмешивание seen | кандидат Задачи 2 | [A100 runner](../vla-a100/run_a100.py) | завершены 18 cells | [summary](runs/a100_final/7d5ef68ac4a84d4e8ad51126b3287c5e/summary.json) | mean success 0.742 / 0.817 / 0.917 при 5 / 10 / 25 демо | action chunks, 360 rollout-эпизодов и видео seed 0 |
+| 4. Подмешивание seen | кандидат Задачи 2 | [A100 runner](../vla-a100/run_a100.py) | завершены 18 cells | [summary](runs/final/summary.json) | mean success 0.742 / 0.817 / 0.917 при 5 / 10 / 25 демо | action chunks, 360 rollout-эпизодов и видео seed 0 |
 | 5. LoRA r=32 | кандидат Задачи 2 | [A100 runner](../vla-a100/run_a100.py) | завершены 18 cells | тот же summary | mean success 0.575 / 0.717 / 0.858 | action chunks, 360 rollout-эпизодов и видео seed 0 |
 | 6. Continuous LAPO Bonus A | Задача 4 | [policy](vla/modeling_latent_smolvla.py), [A100 runner](../vla-a100/run_a100.py) | завершён для 5 демо | тот же summary | success 0/60; representation loss 0.938 → 0.838; policy loss 10.262 → 0.188 | representation, zero/shuffled latent, policy cosine и action controls |
-| 7. Три характерных провала | Задача 3 | [rollouts](rollouts.py), [A100 HTML](report_page.html) | rollout-ы скачаны, разбор не сделан | [120 видео](runs/a100_final/7d5ef68ac4a84d4e8ad51126b3287c5e) |  | выбрать три фейла и записать различающий эксперимент для каждого |
+| 7. Три характерных провала | Задача 3 | [rollouts](rollouts.py), [A100 HTML](report_page.html) | rollout-ы скачаны, разбор не сделан | [120 видео](runs/final) |  | выбрать три фейла и записать различающий эксперимент для каждого |
 
 Финальный запуск разделён на два последовательных task на одной A100 80 GB. Первый task сохранил seen-checkpoint и затем упал в BF16-диагностике после завершённого LAPO representation train. Второй task загрузил тот же checkpoint, прошёл исправленную диагностику и закончил всю матрицу. Они заняли 3240 и 15757 секунд, суммарно 5 ч 17 мин.
 
-В скачанных `run.json` неверно повторяются некоторые LAPO config-поля: `ClearML Task.connect()` менял переданный словарь на месте. Метрики, checkpoints и rollout-результаты не затронуты. Проверенный [manifest](runs/a100_final/7d5ef68ac4a84d4e8ad51126b3287c5e/summary.json) опирается на commit, имена ячеек, фактическое число строк metrics и 45 eval JSON. Observer после запуска исправлен.
+В скачанных `run.json` неверно повторяются некоторые LAPO config-поля: `ClearML Task.connect()` менял переданный словарь на месте. Метрики, checkpoints и rollout-результаты не затронуты. Проверенный [manifest](runs/final/summary.json) опирается на commit, имена ячеек, фактическое число строк metrics и 45 eval JSON. Observer после запуска исправлен.
 
 ### Что показывают старые proxy-прогоны
 
@@ -243,7 +243,7 @@ LoRA действительно обучалась с эффективным LR 
 
 - Конвертер останавливается при несовпадении размеров массивов, пропавших файлах, NaN и неверном числе эпизодов. Это проверка корректности, а не диагностика эксперимента.
 - Каждый запуск сохраняет применённые dataset revision, task и episode IDs, device, dtype, batch size, workers, seed, optimizer, LR, scheduler, обучаемые параметры и новый checkpoint. Это проверяет, что LeRobot не перезаписал настройки своим preset.
-- [Первый tiny-set запуск](tmp/latent_tiny_overfit_console.log) падал в Metal из-за `bfloat16` visual tokens и `float32` transition head. Диагностический код теперь приводит cached tokens к dtype головы. Основная модель не менялась.
+- Первый tiny-set запуск падал в Metal из-за `bfloat16` visual tokens и `float32` transition head. Диагностический код теперь приводит cached tokens к dtype головы. Основная модель не менялась.
 - Методы сравниваются на одинаковых task IDs, init states, eval seeds и числе эпизодов. Короткий отсев помечается отдельно от финального результата.
 
 ## Диагностика поведения
