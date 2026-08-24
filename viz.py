@@ -49,7 +49,7 @@ def rollout(root: Path, name: str, wanted_success: bool | None = None) -> dict:
     return {
         "name": name.replace("_", " "),
         "success": successes[index],
-        "video": str(video.relative_to(RUNS)) if video else None,
+        "video": str(video.relative_to(Path("."))) if video else None,
     }
 
 
