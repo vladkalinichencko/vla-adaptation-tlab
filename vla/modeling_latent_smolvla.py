@@ -10,7 +10,6 @@ from lerobot.utils.constants import ACTION, OBS_LANGUAGE_ATTENTION_MASK, OBS_LAN
 
 from vla.configuration_latent_smolvla import LatentSmolVLAConfig
 
-
 class InverseModel(nn.Module):
     def __init__(self, hidden: int, views: int, latent: int):
         super().__init__()
@@ -23,7 +22,6 @@ class InverseModel(nn.Module):
     def forward(self, current: Tensor, next_frame: Tensor) -> Tensor:
         pair = torch.cat((current.mean(dim=-2), next_frame.mean(dim=-2)), dim=-1)
         return self.network(pair.flatten(-2))
-
 
 class ForwardModel(nn.Module):
     def __init__(self, hidden: int, views: int, latent: int):
@@ -42,7 +40,6 @@ class ForwardModel(nn.Module):
         hidden = hidden + self.view_embedding[None, None, :, None]
         return self.network(hidden)
 
-
 class LatentPolicyHead(nn.Module):
     def __init__(self, hidden: int, views: int, steps: int, latent: int):
         super().__init__()
@@ -57,7 +54,6 @@ class LatentPolicyHead(nn.Module):
     def forward(self, current: Tensor, language: Tensor) -> Tensor:
         context = torch.cat((current.mean(dim=-2).flatten(1), language), dim=-1)
         return self.network(context).reshape(current.shape[0], self.steps, self.latent)
-
 
 class LatentSmolVLAPolicy(SmolVLAPolicy):
     config_class = LatentSmolVLAConfig

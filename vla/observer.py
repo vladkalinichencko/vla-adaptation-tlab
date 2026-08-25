@@ -2,8 +2,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from vla.diagnostics import plain, write_run
+from clearml import Task
 
+from vla.diagnostics import plain, write_run
 
 class TrainingObserver:
     def __init__(self, name: str, config: dict[str, Any], device: str):
@@ -16,8 +17,6 @@ class TrainingObserver:
         write_run(name, {"status": "running", **self.config, "metrics": str(self.path)})
 
         if device == "cuda":
-            from clearml import Task
-
             self.clearml = Task.current_task() or Task.init(project_name="VLA cost curve", task_name=name)
             self.clearml.connect(plain(self.config), name=f"runs/{name}")
 
@@ -58,12 +57,9 @@ class TrainingObserver:
         if self.clearml:
             self.clearml.flush()
 
-
 def log_evaluation(name: str, row: dict[str, Any], device: str) -> None:
     if device != "cuda":
         return
-    from clearml import Task
-
     task = Task.current_task() or Task.init(project_name="VLA cost curve", task_name=name)
     task.connect(plain(row), name=f"evaluations/{name}")
     task.get_logger().report_scalar("eval", "success", row["success"], iteration=row["n_demos"])

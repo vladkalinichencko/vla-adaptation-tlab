@@ -4,17 +4,13 @@ import json
 import re
 from pathlib import Path
 
-
 RUNS = Path("runs")
-
 
 def read_jsonl(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
-
 def keep_curve(rows: list[dict], every: int = 10) -> list[dict]:
     return [row for i, row in enumerate(rows) if i == 0 or i == len(rows) - 1 or (i + 1) % every == 0]
-
 
 def mean_difference(samples: list[dict], left: str, right: str) -> float:
     values = []
@@ -22,7 +18,6 @@ def mean_difference(samples: list[dict], left: str, right: str) -> float:
         for left_step, right_step in zip(sample[left], sample[right], strict=True):
             values.extend(abs(a - b) for a, b in zip(left_step, right_step, strict=True))
     return sum(values) / len(values)
-
 
 def action_run(root: Path, name: str) -> dict:
     samples = json.loads((root / f"actions_final_{name}.json").read_text())
@@ -39,7 +34,6 @@ def action_run(root: Path, name: str) -> dict:
         "mae": mean_difference(samples, "target", "predicted"),
     }
 
-
 def rollout(root: Path, name: str, wanted_success: bool | None = None) -> dict:
     data = json.loads((root / f"eval_final_{name}.json").read_text())
     metrics = data["per_task"][0]["metrics"]
@@ -51,7 +45,6 @@ def rollout(root: Path, name: str, wanted_success: bool | None = None) -> dict:
         "success": successes[index],
         "video": str(video.relative_to(Path("."))) if video else None,
     }
-
 
 def load_data() -> dict:
     summary_path = sorted((RUNS / "final").glob("summary.json"))[-1]
@@ -133,7 +126,6 @@ def load_data() -> dict:
         "videos": videos,
     }
 
-
 TEMPLATE = r'''<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SmolVLA final A100 runs</title><style>
 :root{--fg:#15202b;--mut:#5f6b76;--line:#d6dce2;--blue:#1d4ed8;--orange:#c2410c;--purple:#7c3aed;--paper:#f7f8fa}
@@ -165,12 +157,10 @@ function renderVideos(){const root=document.querySelector("#videos");for(const i
 const s=D.summary;document.querySelector("#readout").innerHTML=`<span>A100 eval episodes<b>${s.matrix.eval_episodes}</b></span><span>successful episodes<b>${s.matrix.successful_episodes}</b></span><span>training metric files<b>${D.adaptation.length+6}</b></span>`;renderCost();renderTraining();renderActionError();renderActions();renderLanguage();renderLapo();renderVideos();
 </script>'''
 
-
 def main() -> None:
     output = Path("report_page.html")
     output.write_text(TEMPLATE.replace("__DATA__", json.dumps(load_data(), ensure_ascii=False)))
     print(output)
-
 
 if __name__ == "__main__":
     main()

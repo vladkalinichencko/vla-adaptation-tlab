@@ -8,7 +8,6 @@ from lerobot.configs.default import DatasetConfig
 from lerobot.datasets.dataset_metadata import LeRobotDatasetMetadata
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-
 BASE_POLICY = "lerobot/smolvla_base"
 BASE_POLICY_REVISION = "c83c3163b8ca9b7e67c509fffd9121e66cb96205"
 SEEN = "local/official_libero_90_v3"
@@ -30,17 +29,14 @@ RENAME = {
 }
 CACHE = Path("datasets")
 
-
 @dataclass(frozen=True)
 class Source:
     repo_id: str
     revision: str
     root: Path | None = None
 
-
 SEEN_SOURCE = Source(SEEN, SEEN_REVISION, SEEN_ROOT)
 TARGET_SOURCE = Source(TARGET, TARGET_REVISION, TARGET_ROOT)
-
 
 @dataclass(frozen=True)
 class Mix:
@@ -48,10 +44,8 @@ class Mix:
     target_frames: int
     total_frames: int
 
-
 def metadata(source: Source) -> LeRobotDatasetMetadata:
     return LeRobotDatasetMetadata(source.repo_id, root=source.root, revision=source.revision)
-
 
 def episode_tasks(source: Source) -> dict[int, int]:
     cache = CACHE / f"episode_tasks_{source.repo_id.replace('/', '_')}_{source.revision[:8]}.json"
@@ -66,7 +60,6 @@ def episode_tasks(source: Source) -> dict[int, int]:
     cache.write_text(json.dumps(mapping, sort_keys=True) + "\n")
     return mapping
 
-
 def first_target_episodes(task_id: int, count: int) -> list[int]:
     task_index = metadata(TARGET_SOURCE).get_task_index(TARGET_INSTRUCTIONS[task_id])
     if task_index is None:
@@ -75,7 +68,6 @@ def first_target_episodes(task_id: int, count: int) -> list[int]:
     if len(episodes) < count:
         raise ValueError(f"Task {task_id} has {len(episodes)} episodes, requested {count}.")
     return episodes[:count]
-
 
 def balanced_seen_episodes(count: int) -> list[int]:
     by_task: dict[int, list[int]] = {}
@@ -96,7 +88,6 @@ def balanced_seen_episodes(count: int) -> list[int]:
         round_index += 1
     return selected
 
-
 def dataset(source: Source, episodes: list[int] | None = None) -> DatasetConfig:
     return DatasetConfig(
         repo_id=source.repo_id,
@@ -104,7 +95,6 @@ def dataset(source: Source, episodes: list[int] | None = None) -> DatasetConfig:
         revision=source.revision,
         episodes=episodes,
     )
-
 
 MIX_FEATURES = {
     "observation.images.image": {
@@ -120,7 +110,6 @@ MIX_FEATURES = {
     "observation.state": {"dtype": "float32", "shape": (8,), "names": ["state"]},
     "action": {"dtype": "float32", "shape": (7,), "names": ["action"]},
 }
-
 
 def _copy_episodes(output: LeRobotDataset, source: Source, episodes: list[int], stride: int) -> int:
     data = LeRobotDataset(
@@ -154,10 +143,8 @@ def _copy_episodes(output: LeRobotDataset, source: Source, episodes: list[int], 
         output.save_episode(parallel_encoding=False)
     return frames
 
-
 def _image(image) -> np.ndarray:
     return np.rint(image.permute(1, 2, 0).numpy().clip(0, 1) * 255).astype(np.uint8)
-
 
 def build_mix(task_id: int, demos: int) -> Mix:
     root = Path("datasets/mixes") / f"goal_{task_id}_n{demos}"

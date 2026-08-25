@@ -16,6 +16,7 @@ import json
 import pathlib
 import statistics
 
+import matplotlib.pyplot as plt
 
 def load(path):
     rows = [json.loads(line) for line in pathlib.Path(path).read_text().splitlines() if line.strip()]
@@ -36,7 +37,6 @@ def load(path):
         )
     return curve
 
-
 def main():
     curve = load("runs/results.jsonl")
     budgets = sorted({n for m in curve.values() for n in m})
@@ -53,8 +53,6 @@ def main():
         print(line)
 
     if curve:
-        import matplotlib.pyplot as plt
-
         fig, ax = plt.subplots(figsize=(5, 4))
         for m in curve:
             ns = sorted(curve[m])
@@ -68,7 +66,6 @@ def main():
         out = pathlib.Path("runs") / "cost_curve.png"
         fig.savefig(out, dpi=150)
         print(f"-> {out}")
-
 
 if __name__ == "__main__":
     main()

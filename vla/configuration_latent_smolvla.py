@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from lerobot.configs.policies import PreTrainedConfig
 from lerobot.policies.smolvla.configuration_smolvla import SmolVLAConfig
 
-
 @PreTrainedConfig.register_subclass("latent_smolvla")
 @dataclass
 class LatentSmolVLAConfig(SmolVLAConfig):

@@ -1,11 +1,12 @@
 import json
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 
 from lerobot.configs.default import EvalConfig
 from lerobot.configs.eval import EvalPipelineConfig
 from lerobot.configs.policies import PreTrainedConfig
+from lerobot.envs import libero
 from lerobot.envs.configs import LiberoEnv
 from lerobot.scripts.lerobot_eval import eval_main
 
@@ -14,7 +15,6 @@ from vla.data import RENAME, TARGET_SOURCE, TARGET_SUITE, first_target_episodes
 from vla.diagnostics import append_result
 from vla.observer import log_evaluation
 from vla.runtime import Runtime
-
 
 def evaluate(
     name: str,
@@ -71,11 +71,8 @@ def evaluate(
     log_evaluation(name, row, runtime.device)
     return row
 
-
 @contextmanager
-def wrong_instruction(instruction: str) -> Iterator[None]:
-    from lerobot.envs import libero
-
+def wrong_instruction(instruction: str) -> Generator[None, None, None]:
     original = libero.LiberoEnv.__init__
 
     def patched(environment, *args, **kwargs):

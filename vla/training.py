@@ -25,7 +25,6 @@ from vla.diagnostics import plain
 from vla.observer import TrainingObserver
 from vla.runtime import Runtime
 
-
 @dataclass
 class TrainingSetup:
     config: TrainPipelineConfig
@@ -33,7 +32,6 @@ class TrainingSetup:
     policy: PreTrainedPolicy
     preprocessor: Any
     postprocessor: Any
-
 
 def load_policy(checkpoint: str | Path, revision: str | None, runtime: Runtime) -> PreTrainedConfig:
     policy = PreTrainedConfig.from_pretrained(checkpoint, revision=revision)
@@ -43,7 +41,6 @@ def load_policy(checkpoint: str | Path, revision: str | None, runtime: Runtime) 
     policy.use_amp = runtime.device == "cuda"
     policy.push_to_hub = False
     return policy
-
 
 def load_latent_policy(
     checkpoint: str | Path,
@@ -70,7 +67,6 @@ def load_latent_policy(
         vision_encode_batch_size=16 if runtime.device == "mps" else 64,
     )
     return LatentSmolVLAConfig(**values)
-
 
 def prepare_training(
     name: str,
@@ -121,7 +117,6 @@ def prepare_training(
         },
     )
     return TrainingSetup(config, data, policy, preprocessor, postprocessor)
-
 
 def train(
     setup: TrainingSetup,
@@ -206,7 +201,6 @@ def train(
         observer.fail(error)
         raise
 
-
 def _loader(setup: TrainingSetup, runtime: Runtime) -> DataLoader:
     generator = torch.Generator().manual_seed(setup.config.seed)
     sampler = RandomSampler(
@@ -226,14 +220,12 @@ def _loader(setup: TrainingSetup, runtime: Runtime) -> DataLoader:
         multiprocessing_context="spawn" if runtime.workers > 0 else None,
     )
 
-
 def _lr_scale(step: int, steps: int, warmup: int, final_ratio: float) -> float:
     if step < warmup:
         return (step + 1) / max(1, warmup)
     progress = (step - warmup) / max(1, steps - warmup)
     cosine = 0.5 * (1 + math.cos(math.pi * min(progress, 1.0)))
     return final_ratio + (1 - final_ratio) * cosine
-
 
 def _save(setup: TrainingSetup) -> Path:
     checkpoint = setup.config.output_dir / "checkpoints" / "last" / "pretrained_model"
@@ -246,7 +238,6 @@ def _save(setup: TrainingSetup) -> Path:
         json.dumps(plain(setup.config.to_dict()), indent=2, ensure_ascii=False) + "\n"
     )
     return checkpoint
-
 
 def _seed_everything(seed: int) -> None:
     random.seed(seed)

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import torch
+from lerobot.configs.policies import PreTrainedConfig
 from lerobot.datasets.factory import resolve_delta_timestamps
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.policies import make_policy, make_pre_post_processors
@@ -13,7 +14,6 @@ from torchvision.utils import save_image
 from vla.data import RENAME, Source, metadata
 from vla.diagnostics import plain
 from vla.runtime import Runtime
-
 
 def augmentation_snapshot(source: Source, episodes: list[int]) -> Path:
     data = LeRobotDataset(
@@ -55,7 +55,6 @@ def augmentation_snapshot(source: Source, episodes: list[int]) -> Path:
     }, indent=2) + "\n")
     return metadata_path
 
-
 def action_snapshot(
     name: str,
     checkpoint: str | Path,
@@ -64,8 +63,6 @@ def action_snapshot(
     runtime: Runtime,
     instruction: str | None = None,
 ) -> Path:
-    from lerobot.configs.policies import PreTrainedConfig
-
     checkpoint = Path(checkpoint)
     config = PreTrainedConfig.from_pretrained(checkpoint)
     config.pretrained_path = checkpoint
@@ -134,7 +131,6 @@ def action_snapshot(
     path.write_text(json.dumps(plain(snapshots), indent=2, ensure_ascii=False) + "\n")
     return path
 
-
 def transition_snapshot(
     name: str,
     checkpoint: str | Path,
@@ -142,8 +138,6 @@ def transition_snapshot(
     episodes: list[int],
     runtime: Runtime,
 ) -> Path:
-    from lerobot.configs.policies import PreTrainedConfig
-
     checkpoint = Path(checkpoint)
     config = PreTrainedConfig.from_pretrained(checkpoint)
     config.pretrained_path = checkpoint
